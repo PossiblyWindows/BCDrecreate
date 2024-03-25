@@ -1,31 +1,28 @@
-# BCDrecreate
+# Windows Boot Repair Script
 
-## Overview
-This batch script provides a menu-driven interface to perform various operations related to the Boot Configuration Data (BCD) on a Windows 10 system. It allows you to recreate BCD entries for Windows Boot Manager and Windows 10 Loader, as well as perform extensive recovery by executing additional commands such as `bcdboot` and `bootrec`.
+This batch script is designed to repair Windows boot configuration and restore bootability using `bcdedit` and `bcdboot`.
+
+## Features
+
+- **Backup BCD**: Creates a backup of the Boot Configuration Data (BCD) before making any changes.
+- **Repair BCD**: Repairs the Boot Configuration Data (BCD) to fix boot-related issues.
+- **Restore Boot Files**: Restores boot files to ensure Windows boots properly.
+- **Reverse Delete Operation**: Reverses the effects of `BCDEDIT /delete {current}` by restoring the deleted boot entry.
+- **Menu**: Provides a menu interface for easy selection of individual operations or an "All-in-One" option to perform all operations sequentially.
 
 ## Usage
-1. Boot your system into a recovery environment or Windows Preinstallation Environment (PE), download and run the script.
-2. If your BCD is critically damaged and you cannot access the script, you can use the following one-liners by launching Command Prompt (CMD) and entering:
-   - Recreate BCD entry for Windows Boot Manager:
-     ```
-     bcdedit /create {bootmgr} /d "Windows Boot Manager"
-     ```
-   - Recreate BCD entry for Windows 10 Loader:
-     ```
-     bcdedit /create /d "Windows 10" /application osloader
-     ```
-   - Extensive recovery using `bootrec`:
-     ```
-     bootrec /fixmbr && bootrec /fixboot && bootrec /rebuildbcd
-     ```
-   - Extensive recovery using `bcdboot`:
-     ```
-     bcdboot C:\Windows /s C: /f ALL
-     ```
 
-## Notes
-- It is recommended to use this script in a recovery environment or Windows Preinstallation Environment (PE) to ensure system stability and avoid interference with running processes.
-- Ensure that you run the script with administrative privileges to avoid permission issues.
-- Use caution when performing extensive recovery as it may modify critical system configurations.
-- If encountering errors or issues, refer to the script output for error messages or consult Windows documentation for troubleshooting steps.
+1. Clone or download the script.
+2. Run the script with administrative privileges (right-click > Run as administrator).
+3. Select an option from the menu to perform the desired operation.
+4. Follow the on-screen instructions if any errors occur.
 
+## Disclaimer
+
+- Use this script at your own risk. Modifying boot configuration data can have serious consequences if not done correctly.
+- Always ensure you have backups of important data before making changes to the boot configuration.
+- The script is provided as-is without any warranties.
+
+## License
+
+This project is licensed under the [MIT License](LICENSE).
