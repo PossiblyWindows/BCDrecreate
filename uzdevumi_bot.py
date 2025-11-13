@@ -1,4 +1,5 @@
 import argparse
+import itertools
 import queue
 import random
 import re
@@ -166,6 +167,17 @@ I18N = {
         "ui_beta_feature_saved": "Presets saglabāts.",
         "ui_beta_feature_loaded": "Presets ielādēts.",
         "ui_beta_feature_error": "Neizdevās apstrādāt presetu: {e}",
+        "ui_advanced_features": "Papildu GUI iespējas",
+        "ui_advanced_hint": "Detalizēti pielāgo žurnālu, izkārtojumu un automātiskās darbības.",
+        "ui_tab_prefixes": "Prefiksi",
+        "ui_tab_suffixes": "Sufiksi",
+        "ui_tab_transforms": "Transformācijas",
+        "ui_tab_highlights": "Izcēlumi",
+        "ui_tab_filters": "Filtri",
+        "ui_tab_actions": "Darbības",
+        "ui_tab_layout": "Izkārtojums",
+        "ui_tab_summary": "Kopsavilkums",
+        "ui_summary_placeholder": "Nav izvēlēta kopsavilkuma metrika.",
         # Prompt for ChatGPT
         "p1": "Tu esi asistents, kas risina uzdevumi.lv testus un sniedz tikai galīgo atbildi.",
         "p2": "Tev tiek dota #taskhtml > div teksta satura kopija. Analizē to un sagatavo risinājumu.",
@@ -287,6 +299,17 @@ I18N = {
         "ui_beta_feature_saved": "Preset saved.",
         "ui_beta_feature_loaded": "Preset loaded.",
         "ui_beta_feature_error": "Failed to process preset: {e}",
+        "ui_advanced_features": "Advanced GUI controls",
+        "ui_advanced_hint": "Fine-tune the log viewer, layout tweaks, and automated reactions.",
+        "ui_tab_prefixes": "Prefixes",
+        "ui_tab_suffixes": "Suffixes",
+        "ui_tab_transforms": "Transforms",
+        "ui_tab_highlights": "Highlights",
+        "ui_tab_filters": "Filters",
+        "ui_tab_actions": "Actions",
+        "ui_tab_layout": "Layout",
+        "ui_tab_summary": "Summary",
+        "ui_summary_placeholder": "Enable summary metrics to see live totals.",
         "p1": "You are an assistant solving uzdevumi.lv tasks and you must output only the final answer.",
         "p2": "You are given the text content of #taskhtml > div. Analyze and produce the solution.",
         "p3": "Answer format:",
@@ -406,6 +429,17 @@ I18N = {
         "ui_beta_feature_saved": "Профиль сохранён.",
         "ui_beta_feature_loaded": "Профиль загружен.",
         "ui_beta_feature_error": "Не удалось обработать профиль: {e}",
+        "ui_advanced_features": "Дополнительные возможности GUI",
+        "ui_advanced_hint": "Тонкая настройка журнала, компоновки и автоматических реакций.",
+        "ui_tab_prefixes": "Префиксы",
+        "ui_tab_suffixes": "Суффиксы",
+        "ui_tab_transforms": "Преобразования",
+        "ui_tab_highlights": "Подсветка",
+        "ui_tab_filters": "Фильтры",
+        "ui_tab_actions": "Действия",
+        "ui_tab_layout": "Макет",
+        "ui_tab_summary": "Сводка",
+        "ui_summary_placeholder": "Включите метрики, чтобы увидеть сводку.",
         "p1": "Вы — ассистент, решающий задания uzdevumi.lv, выводите только окончательный ответ.",
         "p2": "Дан текст содержимого #taskhtml > div. Проанализируйте и дайте решение.",
         "p3": "Формат ответа:",
@@ -619,6 +653,488 @@ BETA_FEATURE_LABELS: Dict[str, str] = {
     "scoped_logging_filters": "Scoped logging hooks",
     "automation_health_checks": "Automation health checks",
     "smart_sleep_reduction": "Reduced sleep delays",
+}
+
+
+@dataclass(frozen=True)
+class GuiFeatureDefinition:
+    name: str
+    label: str
+    category: str
+    kind: str
+    payload: object = None
+
+
+@dataclass(frozen=True)
+class KeywordSpec:
+    name: str
+    label: str
+    icon: str
+    tokens: Tuple[str, ...]
+
+
+@dataclass
+class GuiLogEvent:
+    timestamp: datetime
+    text: str
+    thread_name: str
+    thread_id: int
+
+
+@dataclass
+class GuiLogEntry:
+    timestamp: datetime
+    text: str
+    thread_name: str
+    thread_id: int
+    sequence: int
+    level: str
+    keywords: Set[str]
+
+
+KEYWORD_SPECS: List[KeywordSpec] = [
+    KeywordSpec("login", "Login flow", "🔐", ("login", "logged in", "logging in")),
+    KeywordSpec("cookie", "Cookie banner", "🍪", ("cookie", "cookies", "sīkfail")),
+    KeywordSpec("gpt", "ChatGPT", "🤖", ("gpt", "chatgpt")),
+    KeywordSpec("subject", "Subject picks", "📚", ("subject", "priekšmet")),
+    KeywordSpec("topic", "Topic picks", "🧭", ("topic", "tēma")),
+    KeywordSpec("task", "Task flow", "📝", ("task", "uzdevum")),
+    KeywordSpec("points", "Points", "🎯", ("point", "punkt")),
+    KeywordSpec("top", "Top score", "🏆", ("top", "top points")),
+    KeywordSpec("skip", "Skips", "⏭", ("skip", "skipping", "izlaist")),
+    KeywordSpec("retry", "Retries", "🔁", ("retry", "mēģināj")),
+    KeywordSpec("cycle", "Cycles", "🔄", ("cycle", "cikls")),
+    KeywordSpec("license", "License", "🪪", ("license", "licenc")),
+    KeywordSpec("trial", "Trial", "⏳", ("trial", "izmēģināj")),
+    KeywordSpec("debug", "Debug", "🛠", ("debug",)),
+    KeywordSpec("done", "Completion", "✅", ("done", "gatavs", "pabeig")),
+    KeywordSpec("submitted", "Submissions", "📨", ("submitted", "iesnieg")),
+    KeywordSpec("decline", "Cookie declines", "🚫", ("decline", "noraid")),
+    KeywordSpec("http", "HTTP", "🌐", ("http", "https")),
+    KeywordSpec("prefetch", "Prefetch", "⚡", ("prefetch",)),
+    KeywordSpec("remote", "Remote probes", "📡", ("remote",)),
+    KeywordSpec("driver", "Driver", "🚗", ("driver",)),
+    KeywordSpec("chrome", "Chrome", "🧭", ("chrome",)),
+    KeywordSpec("session", "Session", "🪟", ("session",)),
+    KeywordSpec("metrics", "Metrics", "📈", ("metric",)),
+    KeywordSpec("summary", "Summary", "🧾", ("summary",)),
+    KeywordSpec("dropdown", "Dropdowns", "⬇", ("dropdown", "select box")),
+    KeywordSpec("input", "Inputs", "⌨", ("input", "ievade")),
+    KeywordSpec("selection", "Selections", "✅", ("select", "selection", "izvēle")),
+    KeywordSpec("submit", "Submit", "📤", ("submit", "iesniegt")),
+    KeywordSpec("automation", "Automation", "🤖", ("automation", "automatiz")),
+    KeywordSpec("cache", "Cache", "🗃", ("cache", "keš")),
+    KeywordSpec("probe", "Probes", "🛰", ("probe",)),
+    KeywordSpec("radix", "Radix", "🪄", ("radix",)),
+    KeywordSpec("watchdog", "Watchdog", "👁", ("watchdog",)),
+    KeywordSpec("parallel", "Parallel", "🧵", ("parallel",)),
+    KeywordSpec("queue", "Queue", "📬", ("queue",)),
+    KeywordSpec("thread", "Threads", "🧶", ("thread",)),
+    KeywordSpec("restart", "Restarts", "🔁", ("restart", "restartēt")),
+    KeywordSpec("rebuild", "Rebuilds", "🏗", ("rebuild", "build again")),
+    KeywordSpec("sync", "Sync", "🔄", ("sync", "synchron")),
+    KeywordSpec("filter", "Filters", "🧹", ("filter", "filtr")),
+    KeywordSpec("highlight", "Highlights", "💡", ("highlight", "izcelt")),
+    KeywordSpec("export", "Exports", "📦", ("export", "eksport")),
+    KeywordSpec("import", "Imports", "📥", ("import", "importēt")),
+    KeywordSpec("preset", "Presets", "🗂", ("preset", "profils")),
+    KeywordSpec("credential", "Credentials", "🔑", ("credential", "pierakst")),
+    KeywordSpec("beta", "Beta", "β", ("beta",)),
+    KeywordSpec("feature", "Features", "✨", ("feature", "funkcij")),
+    KeywordSpec("until", "Until target", "🎯", ("until", "mērķ")),
+    KeywordSpec("gain", "Gain", "📈", ("gain", "pieaug")),
+    KeywordSpec("performance", "Performance", "🚀", ("performance", "speed", "ātrum")),
+    KeywordSpec("stability", "Stability", "🛡", ("stability", "stable", "stabil")),
+    KeywordSpec("interface", "Interface", "🖥", ("interface", "ui", "lietot")),
+    KeywordSpec("theme", "Theme", "🎨", ("theme", "appearance", "izskats")),
+    KeywordSpec("history", "History", "📜", ("history", "vēstur", "log history")),
+    KeywordSpec("overview", "Overview", "🧮", ("overview", "summary", "apskats")),
+]
+
+
+KEYWORD_SPEC_BY_NAME: Dict[str, KeywordSpec] = {spec.name: spec for spec in KEYWORD_SPECS}
+
+
+PREFIX_FEATURE_DATA: List[Tuple[str, str, str]] = [
+    ("prefix_time_millis", "Prefix millisecond timestamp", "time_ms"),
+    ("prefix_time_seconds", "Prefix time (HH:MM:SS)", "time_sec"),
+    ("prefix_date_short", "Prefix date (YYYY-MM-DD)", "date_short"),
+    ("prefix_date_long", "Prefix weekday", "date_long"),
+    ("prefix_iso_timestamp", "Prefix ISO timestamp", "iso"),
+    ("prefix_delta_previous", "Prefix delta from previous log", "delta_prev"),
+    ("prefix_delta_start", "Prefix delta from first log", "delta_start"),
+    ("prefix_sequence_number", "Prefix sequence number", "sequence"),
+    ("prefix_thread_name", "Prefix thread name", "thread_name"),
+    ("prefix_thread_id", "Prefix thread id", "thread_id"),
+    ("prefix_log_level", "Prefix log level", "level"),
+    ("prefix_primary_keyword", "Prefix primary keyword", "keyword"),
+    ("prefix_language", "Prefix active language", "language"),
+    ("prefix_beta_state", "Prefix beta state", "beta"),
+]
+
+
+SUFFIX_FEATURE_DATA: List[Tuple[str, str, str]] = [
+    ("suffix_message_length", "Suffix message length", "len"),
+    ("suffix_word_count", "Suffix word count", "words"),
+    ("suffix_char_count", "Suffix character count", "chars"),
+    ("suffix_digit_sum", "Suffix digit sum", "digit_sum"),
+    ("suffix_numeric_values", "Suffix numeric tokens", "numbers"),
+    ("suffix_points_estimate", "Suffix points estimate", "points"),
+    ("suffix_keyword_count", "Suffix keyword count", "keyword_count"),
+    ("suffix_sequence_index", "Suffix display index", "index"),
+    ("suffix_elapsed_minutes", "Suffix elapsed minutes", "elapsed_minutes"),
+    ("suffix_elapsed_seconds", "Suffix elapsed seconds", "elapsed_seconds"),
+    ("suffix_thread_marker", "Suffix thread marker", "thread_marker"),
+    ("suffix_message_hash", "Suffix short hash", "hash"),
+    ("suffix_cycle_marker", "Suffix cycle marker", "cycle_flag"),
+    ("suffix_summary_pointer", "Suffix summary pointer", "summary_pointer"),
+]
+
+
+TRANSFORM_FEATURE_DATA: List[Tuple[str, str, str]] = [
+    ("transform_uppercase_errors", "Uppercase error lines", "uppercase_error"),
+    ("transform_uppercase_warnings", "Uppercase warning lines", "uppercase_warning"),
+    ("transform_lowercase_info", "Lowercase info lines", "lowercase_info"),
+    ("transform_title_case", "Title-case log entries", "title_case"),
+    ("transform_emphasize_numbers", "Emphasize numbers", "emphasize_numbers"),
+    ("transform_emphasize_keywords", "Emphasize tracked keywords", "emphasize_keywords"),
+    ("transform_replace_points", "Rename points → pts", "rename_points"),
+    ("transform_pad_brackets", "Pad bracketed values", "pad_brackets"),
+    ("transform_strip_whitespace", "Collapse repeated whitespace", "strip_spaces"),
+    ("transform_indent_multiline", "Indent multi-line entries", "indent_multiline"),
+    ("transform_bullet_prefix", "Add bullet prefix", "bullet"),
+    ("transform_capitalize_first", "Capitalize first character", "capitalize_first"),
+    ("wrapper_brackets", "Wrap entry with brackets", "wrap_brackets"),
+    ("wrapper_chevrons", "Wrap entry with « »", "wrap_chevrons"),
+    ("wrapper_pipes", "Wrap entry with pipes", "wrap_pipes"),
+    ("wrapper_stars", "Wrap entry with stars", "wrap_stars"),
+    ("wrapper_box", "Wrap entry with box edges", "wrap_box"),
+    ("wrapper_wave", "Wrap entry with waves", "wrap_wave"),
+]
+
+
+FILTER_FEATURE_DATA: List[Tuple[str, str, Dict[str, object]]] = [
+    ("filter_errors_only", "Show only errors and warnings", {"mode": "only_level", "value": "alert"}),
+    ("filter_errors_only_strict", "Show only errors", {"mode": "only_level", "value": "error"}),
+    ("filter_warnings_only", "Show only warnings", {"mode": "only_level", "value": "warning"}),
+    ("filter_hide_info_lines", "Hide info lines", {"mode": "hide_level", "value": "info"}),
+    ("filter_hide_success_lines", "Hide success lines", {"mode": "hide_keyword", "value": "done"}),
+    ("filter_hide_gpt_lines", "Hide ChatGPT lines", {"mode": "hide_keyword", "value": "gpt"}),
+    ("filter_hide_license_lines", "Hide license chatter", {"mode": "hide_keyword", "value": "license"}),
+    ("filter_hide_prefetch_lines", "Hide prefetch telemetry", {"mode": "hide_keyword", "value": "prefetch"}),
+    ("filter_hide_cycle_lines", "Hide cycle markers", {"mode": "hide_keyword", "value": "cycle"}),
+    ("filter_hide_duplicates", "Hide duplicate messages", {"mode": "hide_duplicates", "value": True}),
+]
+
+
+ACTION_FEATURE_DATA: List[Tuple[str, str, str]] = [
+    ("action_beep_errors", "Play alert on errors", "beep_error"),
+    ("action_beep_warnings", "Play alert on warnings", "beep_warning"),
+    ("action_beep_cycles", "Play alert on cycles", "beep_cycle"),
+    ("action_copy_errors", "Copy errors to clipboard", "copy_error"),
+    ("action_copy_gpt", "Copy ChatGPT replies", "copy_gpt"),
+    ("action_copy_done", "Copy completion lines", "copy_done"),
+    ("action_focus_errors", "Focus window on errors", "focus_error"),
+    ("action_pause_on_errors", "Pause logging on errors", "pause_error"),
+    ("action_auto_clear_cycles", "Clear log when cycles change", "clear_cycle"),
+    ("action_auto_wrap_long", "Enable wrap for long messages", "wrap_long"),
+]
+
+
+LAYOUT_FEATURE_DATA: List[Tuple[str, str, str]] = [
+    ("layout_expand_log_height", "Expand log height", "expand_log"),
+    ("layout_compact_panels", "Compact panel padding", "compact_panels"),
+    ("layout_bold_headers", "Bolden headers", "bold_headers"),
+    ("layout_wide_buttons", "Widen control buttons", "wide_buttons"),
+    ("layout_highlight_beta_panel", "Highlight beta panel", "highlight_beta"),
+    ("layout_highlight_advanced_panel", "Highlight advanced panel", "highlight_advanced"),
+    ("layout_highlight_log_panel", "Highlight log panel", "highlight_log"),
+    ("layout_round_controls", "Round control corners", "round_entries"),
+    ("layout_dim_background", "Dim panel backgrounds", "dim_panels"),
+    ("layout_flat_buttons", "Flatten buttons", "flat_buttons"),
+]
+
+
+SUMMARY_FEATURE_DATA: List[Tuple[str, str, str]] = [
+    ("summary_total_logs", "Total log lines", "total"),
+    ("summary_error_count", "Error count", "errors"),
+    ("summary_warning_count", "Warning count", "warnings"),
+    ("summary_info_count", "Info count", "infos"),
+    ("summary_last_message", "Last message", "last_message"),
+    ("summary_last_error", "Last error", "last_error"),
+    ("summary_last_warning", "Last warning", "last_warning"),
+    ("summary_last_keyword", "Last highlighted keyword", "last_keyword"),
+    ("summary_gpt_mentions", "GPT mentions", "gpt_mentions"),
+    ("summary_cycle_mentions", "Cycle mentions", "cycle_mentions"),
+    ("summary_task_mentions", "Task mentions", "task_mentions"),
+    ("summary_subject_mentions", "Subject mentions", "subject_mentions"),
+    ("summary_retry_mentions", "Retry mentions", "retry_mentions"),
+    ("summary_skip_mentions", "Skip mentions", "skip_mentions"),
+    ("summary_prefetch_mentions", "Prefetch mentions", "prefetch_mentions"),
+    ("summary_license_mentions", "License mentions", "license_mentions"),
+    ("summary_points_total", "Total numeric points", "points_total"),
+    ("summary_duration", "Log duration", "duration"),
+    ("summary_average_length", "Average length", "avg_length"),
+    ("summary_unique_keywords", "Unique keywords", "unique_keywords"),
+    ("summary_done_mentions", "Done mentions", "done_mentions"),
+]
+
+
+GUI_FEATURE_DEFINITIONS: List[GuiFeatureDefinition] = []
+
+for name, label, payload in PREFIX_FEATURE_DATA:
+    GUI_FEATURE_DEFINITIONS.append(GuiFeatureDefinition(name, label, "Prefixes", "prefix", payload))
+
+for name, label, payload in SUFFIX_FEATURE_DATA:
+    GUI_FEATURE_DEFINITIONS.append(GuiFeatureDefinition(name, label, "Suffixes", "suffix", payload))
+
+for name, label, payload in TRANSFORM_FEATURE_DATA:
+    GUI_FEATURE_DEFINITIONS.append(GuiFeatureDefinition(name, label, "Transforms", "transform", payload))
+
+for name, label, payload in FILTER_FEATURE_DATA:
+    GUI_FEATURE_DEFINITIONS.append(GuiFeatureDefinition(name, label, "Filters", "filter", payload))
+
+for name, label, payload in ACTION_FEATURE_DATA:
+    GUI_FEATURE_DEFINITIONS.append(GuiFeatureDefinition(name, label, "Actions", "action", payload))
+
+for name, label, payload in LAYOUT_FEATURE_DATA:
+    GUI_FEATURE_DEFINITIONS.append(GuiFeatureDefinition(name, label, "Layout", "layout", payload))
+
+for name, label, payload in SUMMARY_FEATURE_DATA:
+    GUI_FEATURE_DEFINITIONS.append(GuiFeatureDefinition(name, label, "Summary", "summary", payload))
+
+for spec in KEYWORD_SPECS:
+    GUI_FEATURE_DEFINITIONS.append(
+        GuiFeatureDefinition(
+            f"highlight_keyword_{spec.name}",
+            f"Highlight {spec.label}",
+            "Highlights",
+            "keyword-highlight",
+            spec.name,
+        )
+    )
+    GUI_FEATURE_DEFINITIONS.append(
+        GuiFeatureDefinition(
+            f"filter_keyword_{spec.name}",
+            f"Show only {spec.label}",
+            "Filters",
+            "keyword-filter",
+            spec.name,
+        )
+    )
+
+
+GUI_FEATURE_BY_NAME: Dict[str, GuiFeatureDefinition] = {
+    feature.name: feature for feature in GUI_FEATURE_DEFINITIONS
+}
+
+
+GUI_FEATURES_BY_CATEGORY: Dict[str, List[GuiFeatureDefinition]] = {}
+for feature in GUI_FEATURE_DEFINITIONS:
+    GUI_FEATURES_BY_CATEGORY.setdefault(feature.category, []).append(feature)
+
+
+GUI_CATEGORY_ORDER = (
+    "Prefixes",
+    "Suffixes",
+    "Transforms",
+    "Highlights",
+    "Filters",
+    "Actions",
+    "Layout",
+    "Summary",
+)
+
+
+PREFIX_FEATURE_NAMES = [
+    feature.name for feature in GUI_FEATURE_DEFINITIONS if feature.kind == "prefix"
+]
+SUFFIX_FEATURE_NAMES = [
+    feature.name for feature in GUI_FEATURE_DEFINITIONS if feature.kind == "suffix"
+]
+TRANSFORM_FEATURE_NAMES = [
+    feature.name for feature in GUI_FEATURE_DEFINITIONS if feature.kind == "transform"
+]
+FILTER_FEATURE_NAMES = [
+    feature.name for feature in GUI_FEATURE_DEFINITIONS if feature.kind == "filter"
+]
+ACTION_FEATURE_NAMES = [
+    feature.name for feature in GUI_FEATURE_DEFINITIONS if feature.kind == "action"
+]
+LAYOUT_FEATURE_NAMES = [
+    feature.name for feature in GUI_FEATURE_DEFINITIONS if feature.kind == "layout"
+]
+SUMMARY_FEATURE_NAMES = [
+    feature.name for feature in GUI_FEATURE_DEFINITIONS if feature.kind == "summary"
+]
+KEYWORD_HIGHLIGHT_NAMES = [
+    feature.name for feature in GUI_FEATURE_DEFINITIONS if feature.kind == "keyword-highlight"
+]
+KEYWORD_FILTER_NAMES = [
+    feature.name for feature in GUI_FEATURE_DEFINITIONS if feature.kind == "keyword-filter"
+]
+
+
+def detect_log_level(message: str) -> str:
+    lower = message.lower()
+    if "❌" in message or "error" in lower or "nepareiz" in lower:
+        return "error"
+    if "⚠" in message or "warn" in lower:
+        return "warning"
+    return "info"
+
+
+def match_keywords(message: str) -> Set[str]:
+    lower = message.lower()
+    hits: Set[str] = set()
+    for spec in KEYWORD_SPECS:
+        if any(token in lower for token in spec.tokens):
+            hits.add(spec.name)
+    return hits
+
+
+def format_duration(seconds: float) -> str:
+    total_seconds = max(0, int(seconds))
+    minutes, secs = divmod(total_seconds, 60)
+    hours, minutes = divmod(minutes, 60)
+    if hours:
+        return f"{hours}h{minutes:02d}m{secs:02d}s"
+    if minutes:
+        return f"{minutes}m{secs:02d}s"
+    return f"{secs}s"
+
+
+def _join_non_empty(parts: List[str], sep: str = " ") -> str:
+    filtered = [part for part in parts if part]
+    return sep.join(filtered)
+
+
+def _format_delta(prev: Optional[datetime], current: datetime) -> str:
+    if not prev:
+        return ""
+    delta = (current - prev).total_seconds()
+    if delta == 0:
+        return "Δ0.000s"
+    sign = "-" if delta < 0 else ""
+    delta = abs(delta)
+    if delta >= 60:
+        minutes, secs = divmod(delta, 60)
+        return f"Δ{sign}{int(minutes)}m{secs:04.1f}s"
+    return f"Δ{sign}{delta:.3f}s"
+
+
+def _format_from_start(start: Optional[datetime], current: datetime) -> str:
+    if not start:
+        return ""
+    delta = (current - start).total_seconds()
+    return f"T+{format_duration(delta)}"
+
+
+PREFIX_RENDERERS: Dict[str, Callable[[GuiLogEntry, Dict[str, object]], str]] = {
+    "time_ms": lambda entry, ctx: entry.timestamp.strftime("%H:%M:%S.%f")[:-3],
+    "time_sec": lambda entry, ctx: entry.timestamp.strftime("%H:%M:%S"),
+    "date_short": lambda entry, ctx: entry.timestamp.strftime("%Y-%m-%d"),
+    "date_long": lambda entry, ctx: entry.timestamp.strftime("%A"),
+    "iso": lambda entry, ctx: entry.timestamp.isoformat(timespec="seconds"),
+    "delta_prev": lambda entry, ctx: _format_delta(ctx.get("previous_timestamp"), entry.timestamp),
+    "delta_start": lambda entry, ctx: _format_from_start(ctx.get("first_timestamp"), entry.timestamp),
+    "sequence": lambda entry, ctx: f"#{entry.sequence}",
+    "thread_name": lambda entry, ctx: entry.thread_name or "thread",
+    "thread_id": lambda entry, ctx: str(entry.thread_id),
+    "level": lambda entry, ctx: entry.level.upper(),
+    "keyword": lambda entry, ctx: ctx.get("primary_keyword_label", ""),
+    "language": lambda entry, ctx: ctx.get("language", ""),
+    "beta": lambda entry, ctx: ctx.get("beta_state", ""),
+}
+
+
+def _suffix_points(entry: GuiLogEntry) -> str:
+    matches = POINTS_PATTERN.findall(entry.text)
+    if not matches:
+        return ""
+    total = sum(float(value.replace(",", ".")) for value in matches)
+    return f"(pts~:{total:.1f})"
+
+
+SUFFIX_RENDERERS: Dict[str, Callable[[GuiLogEntry, Dict[str, object]], str]] = {
+    "len": lambda entry, ctx: f"(len:{len(entry.text)})",
+    "words": lambda entry, ctx: f"(words:{len(entry.text.split())})",
+    "chars": lambda entry, ctx: f"(chars:{len(entry.text)})",
+    "digit_sum": lambda entry, ctx: f"(∑digits:{sum(int(ch) for ch in entry.text if ch.isdigit())})",
+    "numbers": lambda entry, ctx: "[" + ",".join(re.findall(r"-?\\d+(?:[.,]\\d+)?", entry.text)) + "]" if re.search(r"-?\\d", entry.text) else "",
+    "points": lambda entry, ctx: _suffix_points(entry),
+    "keyword_count": lambda entry, ctx: f"(keys:{len(entry.keywords)})" if entry.keywords else "",
+    "index": lambda entry, ctx: f"(idx:{ctx.get('display_index', 0) + 1})",
+    "elapsed_minutes": lambda entry, ctx: f"(+{int(max(0.0, (entry.timestamp - ctx.get('first_timestamp', entry.timestamp)).total_seconds()) // 60)}m)",
+    "elapsed_seconds": lambda entry, ctx: f"(+{int(max(0.0, (entry.timestamp - ctx.get('first_timestamp', entry.timestamp)).total_seconds()))}s)",
+    "thread_marker": lambda entry, ctx: f"(thread:{entry.thread_name})" if entry.thread_name else "",
+    "hash": lambda entry, ctx: f"#H{hashlib.md5(entry.text.encode('utf-8')).hexdigest()[:4]}",
+    "cycle_flag": lambda entry, ctx: "[cycle]" if "cycle" in entry.text.lower() else "",
+    "summary_pointer": lambda entry, ctx: "[Σ]" if ctx.get("summary_enabled") else "",
+}
+
+
+def _wrap_numbers(text: str) -> str:
+    return re.sub(r"(-?\\d+(?:[.,]\\d+)?)", r"⟦\\1⟧", text)
+
+
+def _emphasize_keywords(text: str, entry: GuiLogEntry) -> str:
+    result = text
+    for name in entry.keywords:
+        spec = KEYWORD_SPEC_BY_NAME.get(name)
+        if not spec:
+            continue
+        for token in spec.tokens:
+            if token.strip() and re.search(re.escape(token), result, flags=re.IGNORECASE):
+                result = re.sub(re.escape(token), lambda m: m.group(0).upper(), result, flags=re.IGNORECASE)
+                break
+    return result
+
+
+TRANSFORM_HANDLERS: Dict[str, Callable[[str, GuiLogEntry], str]] = {
+    "uppercase_error": lambda text, entry: text.upper() if entry.level == "error" else text,
+    "uppercase_warning": lambda text, entry: text.upper() if entry.level == "warning" else text,
+    "lowercase_info": lambda text, entry: text.lower() if entry.level == "info" else text,
+    "title_case": lambda text, entry: text.title(),
+    "emphasize_numbers": lambda text, entry: _wrap_numbers(text),
+    "emphasize_keywords": lambda text, entry: _emphasize_keywords(text, entry),
+    "rename_points": lambda text, entry: re.sub(r"points", "pts", text, flags=re.IGNORECASE),
+    "pad_brackets": lambda text, entry: re.sub(r"\[(.*?)\]", r"[ \1 ]", text),
+    "strip_spaces": lambda text, entry: " ".join(text.split()),
+    "indent_multiline": lambda text, entry: text if "\n" not in text else "\n".join([text.split("\n", 1)[0]] + ["    " + part for part in text.split("\n")[1:]]),
+    "bullet": lambda text, entry: f"• {text}",
+    "capitalize_first": lambda text, entry: text[:1].upper() + text[1:] if text else text,
+    "wrap_brackets": lambda text, entry: f"[ {text} ]",
+    "wrap_chevrons": lambda text, entry: f"« {text} »",
+    "wrap_pipes": lambda text, entry: f"| {text} |",
+    "wrap_stars": lambda text, entry: f"★ {text} ★",
+    "wrap_box": lambda text, entry: f"┏ {text} ┛",
+    "wrap_wave": lambda text, entry: f"≈ {text} ≈",
+}
+
+
+SUMMARY_RENDERERS: Dict[str, Callable[[Dict[str, object]], str]] = {
+    "total": lambda stats: f"Logs: {stats['total']}" if stats["total"] else "",
+    "errors": lambda stats: f"Errors: {stats['errors']}" if stats["errors"] else "",
+    "warnings": lambda stats: f"Warnings: {stats['warnings']}" if stats["warnings"] else "",
+    "infos": lambda stats: f"Info: {stats['infos']}" if stats["infos"] else "",
+    "last_message": lambda stats: f"Last: {stats['last_message']}" if stats.get("last_message") else "",
+    "last_error": lambda stats: f"Last error: {stats['last_error']}" if stats.get("last_error") else "",
+    "last_warning": lambda stats: f"Last warning: {stats['last_warning']}" if stats.get("last_warning") else "",
+    "last_keyword": lambda stats: f"Keyword: {stats['last_keyword']}" if stats.get("last_keyword") else "",
+    "gpt_mentions": lambda stats: f"GPT: {stats['keyword_counts'].get('gpt', 0)}" if stats['keyword_counts'].get("gpt") else "",
+    "cycle_mentions": lambda stats: f"Cycles: {stats['keyword_counts'].get('cycle', 0)}" if stats['keyword_counts'].get("cycle") else "",
+    "task_mentions": lambda stats: f"Tasks: {stats['keyword_counts'].get('task', 0)}" if stats['keyword_counts'].get("task") else "",
+    "subject_mentions": lambda stats: f"Subjects: {stats['keyword_counts'].get('subject', 0)}" if stats['keyword_counts'].get("subject") else "",
+    "retry_mentions": lambda stats: f"Retries: {stats['keyword_counts'].get('retry', 0)}" if stats['keyword_counts'].get("retry") else "",
+    "skip_mentions": lambda stats: f"Skips: {stats['keyword_counts'].get('skip', 0)}" if stats['keyword_counts'].get("skip") else "",
+    "prefetch_mentions": lambda stats: f"Prefetch: {stats['keyword_counts'].get('prefetch', 0)}" if stats['keyword_counts'].get("prefetch") else "",
+    "license_mentions": lambda stats: f"License: {stats['keyword_counts'].get('license', 0)}" if stats['keyword_counts'].get("license") else "",
+    "points_total": lambda stats: f"Σpts: {stats['points_total']:.1f}" if stats["points_total"] else "",
+    "duration": lambda stats: f"Span: {format_duration(stats['duration'])}" if stats.get("duration") else "",
+    "avg_length": lambda stats: f"Avg len: {stats['avg_length']:.0f}" if stats.get("avg_length") else "",
+    "unique_keywords": lambda stats: f"Keywords: {stats['unique_keywords']}" if stats.get("unique_keywords") else "",
+    "done_mentions": lambda stats: f"Done: {stats['keyword_counts'].get('done', 0)}" if stats['keyword_counts'].get("done") else "",
 }
 
 
@@ -2432,82 +2948,567 @@ def run_customtkinter_ui(ctk, default_lang: str = "lv", debug_default: bool = Fa
     beta_count_label = ctk.CTkLabel(beta_tools, text="")
     beta_count_label.grid(row=4, column=0, columnspan=6, padx=8, pady=(0, 8), sticky="w")
 
+    advanced_tools = ctk.CTkFrame(app)
+    advanced_tools.grid(row=8, column=0, padx=12, pady=8, sticky="nsew")
+    advanced_tools.grid_columnconfigure(0, weight=1)
+    advanced_tools.grid_rowconfigure(2, weight=1)
+    advanced_title = ctk.CTkLabel(advanced_tools, text=L("ui_advanced_features"), font=("Arial", 15, "bold"))
+    advanced_title.grid(row=0, column=0, padx=8, pady=(8, 0), sticky="w")
+    advanced_hint = ctk.CTkLabel(advanced_tools, text=L("ui_advanced_hint"))
+    advanced_hint.grid(row=1, column=0, padx=8, pady=(0, 6), sticky="w")
+
+    advanced_tabs = ctk.CTkTabview(advanced_tools, height=220)
+    advanced_tabs.grid(row=2, column=0, padx=8, pady=4, sticky="nsew")
+
+    tab_translations = {
+        "Prefixes": "ui_tab_prefixes",
+        "Suffixes": "ui_tab_suffixes",
+        "Transforms": "ui_tab_transforms",
+        "Highlights": "ui_tab_highlights",
+        "Filters": "ui_tab_filters",
+        "Actions": "ui_tab_actions",
+        "Layout": "ui_tab_layout",
+        "Summary": "ui_tab_summary",
+    }
+    advanced_tab_frames: Dict[str, ctk.CTkScrollableFrame] = {}
+    for category in GUI_CATEGORY_ORDER:
+        advanced_tabs.add(category)
+        advanced_tabs._tab_dict[category]["text_label"].configure(text=L(tab_translations[category]))
+        container = advanced_tabs.tab(category)
+        frame = ctk.CTkScrollableFrame(container, height=200)
+        frame.pack(fill="both", expand=True, padx=4, pady=4)
+        frame.grid_columnconfigure(0, weight=1)
+        advanced_tab_frames[category] = frame
+
+    advanced_feature_vars: Dict[str, tk.BooleanVar] = {}
+    advanced_feature_widgets: Dict[str, ctk.CTkCheckBox] = {}
+    for category, frame in advanced_tab_frames.items():
+        for row_index, feature in enumerate(
+            sorted(GUI_FEATURES_BY_CATEGORY.get(category, []), key=lambda f: f.label)
+        ):
+            var = tk.BooleanVar(value=False)
+            chk = ctk.CTkCheckBox(
+                frame,
+                text=feature.label,
+                variable=var,
+                command=lambda n=feature.name: on_advanced_feature_toggle(n),
+            )
+            chk.grid(row=row_index, column=0, padx=6, pady=2, sticky="w")
+            advanced_feature_vars[feature.name] = var
+            advanced_feature_widgets[feature.name] = chk
+
     btns = ctk.CTkFrame(app)
-    btns.grid(row=8, column=0, padx=12, pady=8, sticky="ew")
+    btns.grid(row=9, column=0, padx=12, pady=8, sticky="ew")
     start_btn = ctk.CTkButton(btns, text=L("ui_start"))
     start_btn.grid(row=0, column=0, padx=8, pady=8)
     ctk.CTkButton(btns, text=L("ui_close"), command=app.destroy).grid(row=0, column=1, padx=8, pady=8)
 
     log_box = ctk.CTkTextbox(app, height=240)
-    log_box.grid(row=9, column=0, padx=12, pady=(8, 12), sticky="nsew")
-    app.grid_rowconfigure(9, weight=1)
+    log_box.grid(row=10, column=0, padx=12, pady=(8, 6), sticky="nsew")
+    app.grid_rowconfigure(10, weight=1)
     log_box.configure(state="disabled")
     log_box.tag_configure("error", foreground="#ff5c5c")
     log_box.tag_configure("warning", foreground="#f5a623")
-    log_queue: "queue.Queue[Tuple[datetime, str]]" = queue.Queue()
-    log_history: List[Tuple[datetime, str]] = []
-    pending_logs: List[Tuple[datetime, str]] = []
 
-    def get_filtered_lines() -> List[Tuple[datetime, str]]:
+    log_summary_label = ctk.CTkLabel(app, text=L("ui_summary_placeholder"), anchor="w")
+    log_summary_label.grid(row=11, column=0, padx=12, pady=(0, 12), sticky="ew")
+
+    log_queue: "queue.Queue[GuiLogEvent]" = queue.Queue()
+    log_history: List[GuiLogEntry] = []
+    pending_logs: List[GuiLogEntry] = []
+    log_sequence_counter = itertools.count(1)
+    log_first_timestamp: Optional[datetime] = None
+
+    def is_action_enabled(payload: str) -> bool:
+        for name in ACTION_FEATURE_NAMES:
+            if advanced_feature_vars.get(name) and advanced_feature_vars[name].get():
+                feature = GUI_FEATURE_BY_NAME.get(name)
+                if feature and feature.payload == payload:
+                    return True
+        return False
+
+    def active_feature_names(names: List[str]) -> List[str]:
+        return [name for name in names if advanced_feature_vars.get(name) and advanced_feature_vars[name].get()]
+
+    def active_highlight_specs() -> List[KeywordSpec]:
+        specs: List[KeywordSpec] = []
+        for name in KEYWORD_HIGHLIGHT_NAMES:
+            if not advanced_feature_vars.get(name) or not advanced_feature_vars[name].get():
+                continue
+            feature = GUI_FEATURE_BY_NAME.get(name)
+            if not feature:
+                continue
+            spec = KEYWORD_SPEC_BY_NAME.get(feature.payload)
+            if spec:
+                specs.append(spec)
+        return specs
+
+    def render_entries(entries: List[GuiLogEntry]) -> List[str]:
+        rendered: List[str] = []
+        prefixes = active_feature_names(PREFIX_FEATURE_NAMES)
+        suffixes = active_feature_names(SUFFIX_FEATURE_NAMES)
+        transforms = active_feature_names(TRANSFORM_FEATURE_NAMES)
+        highlights = active_highlight_specs()
+        summary_enabled = any(advanced_feature_vars.get(name) and advanced_feature_vars[name].get() for name in SUMMARY_FEATURE_NAMES)
+        beta_enabled = bool(BETA_STATE and BETA_STATE.enabled)
+        beta_total = len(beta_feature_vars)
+        beta_active = sum(1 for var in beta_feature_vars.values() if var.get())
+        beta_state_text = f"β:{beta_active}/{beta_total}" if beta_enabled else "β:off"
+        prev_ts: Optional[datetime] = None
+        first_ts = log_first_timestamp
+        for index, entry in enumerate(entries):
+            context: Dict[str, object] = {
+                "previous_timestamp": prev_ts,
+                "first_timestamp": first_ts or entry.timestamp,
+                "display_index": index,
+                "language": lang_var.get(),
+                "beta_state": beta_state_text,
+                "summary_enabled": summary_enabled,
+            }
+            if first_ts is None:
+                first_ts = entry.timestamp
+            primary_label = None
+            for spec in KEYWORD_SPECS:
+                if spec.name in entry.keywords:
+                    primary_label = spec.label
+                    break
+            context["primary_keyword_label"] = primary_label
+            text = entry.text
+            for name in transforms:
+                feature = GUI_FEATURE_BY_NAME.get(name)
+                if not feature:
+                    continue
+                handler = TRANSFORM_HANDLERS.get(feature.payload)
+                if handler:
+                    text = handler(text, entry)
+            highlight_prefixes: List[str] = []
+            for spec in highlights:
+                if spec.name in entry.keywords:
+                    highlight_prefixes.append(f"{spec.icon} {spec.label}")
+            if highlight_prefixes:
+                text = _join_non_empty(highlight_prefixes, " | ") + " " + text
+            prefix_parts: List[str] = []
+            for name in prefixes:
+                feature = GUI_FEATURE_BY_NAME.get(name)
+                if not feature:
+                    continue
+                renderer = PREFIX_RENDERERS.get(feature.payload)
+                if renderer:
+                    prefix_parts.append(renderer(entry, context))
+            suffix_parts: List[str] = []
+            for name in suffixes:
+                feature = GUI_FEATURE_BY_NAME.get(name)
+                if not feature:
+                    continue
+                renderer = SUFFIX_RENDERERS.get(feature.payload)
+                if renderer:
+                    suffix_parts.append(renderer(entry, context))
+            prefix_text = _join_non_empty(prefix_parts, " | ")
+            suffix_text = _join_non_empty(suffix_parts, " ")
+            display = text
+            if log_timestamp_var.get():
+                display = f"[{entry.timestamp.strftime('%H:%M:%S')}] {display}"
+            if prefix_text:
+                display = f"{prefix_text} → {display}"
+            if suffix_text:
+                display = f"{display} {suffix_text}"
+            rendered.append(display.strip())
+            prev_ts = entry.timestamp
+        return rendered
+
+    def apply_filters(entries: List[GuiLogEntry]) -> List[GuiLogEntry]:
+        only_levels: Set[str] = set()
+        hide_levels: Set[str] = set()
+        hide_keywords: List[str] = []
+        hide_duplicates = False
+        only_keyword_names: Set[str] = set()
+        for name in FILTER_FEATURE_NAMES:
+            if not advanced_feature_vars.get(name) or not advanced_feature_vars[name].get():
+                continue
+            feature = GUI_FEATURE_BY_NAME.get(name)
+            if not feature:
+                continue
+            payload = feature.payload or {}
+            mode = payload.get("mode")
+            value = payload.get("value")
+            if mode == "only_level" and isinstance(value, str):
+                only_levels.add(value)
+            elif mode == "hide_level" and isinstance(value, str):
+                hide_levels.add(value)
+            elif mode == "hide_keyword" and isinstance(value, str):
+                hide_keywords.append(value)
+            elif mode == "hide_duplicates":
+                hide_duplicates = True
+        for name in KEYWORD_FILTER_NAMES:
+            if advanced_feature_vars.get(name) and advanced_feature_vars[name].get():
+                feature = GUI_FEATURE_BY_NAME.get(name)
+                if feature:
+                    only_keyword_names.add(feature.payload)
+        result: List[GuiLogEntry] = []
+        seen: Set[str] = set()
+        for entry in entries:
+            level = entry.level
+            if "alert" in only_levels and level not in {"error", "warning"}:
+                continue
+            if "error" in only_levels and level != "error":
+                continue
+            if "warning" in only_levels and level != "warning":
+                continue
+            if level in hide_levels:
+                continue
+            lower_text = entry.text.lower()
+            if hide_keywords and any(keyword in lower_text for keyword in hide_keywords):
+                continue
+            if only_keyword_names and not any(keyword in only_keyword_names for keyword in entry.keywords):
+                continue
+            if hide_duplicates:
+                key = lower_text
+                if key in seen:
+                    continue
+                seen.add(key)
+            result.append(entry)
+        return result
+
+    def get_visible_entries() -> List[GuiLogEntry]:
+        entries = apply_filters(list(log_history))
         query = (log_filter_var.get() or "").strip().lower()
         if not query:
-            return list(log_history)
-        return [entry for entry in log_history if query in entry[1].lower()]
+            return entries
+        return [entry for entry in entries if query in entry.text.lower()]
+
+    def compute_log_stats(entries: List[GuiLogEntry]) -> Dict[str, object]:
+        stats: Dict[str, object] = {
+            "total": len(entries),
+            "errors": 0,
+            "warnings": 0,
+            "infos": 0,
+            "last_message": entries[-1].text if entries else None,
+            "last_error": None,
+            "last_warning": None,
+            "last_keyword": None,
+            "keyword_counts": {},
+            "points_total": 0.0,
+            "duration": 0.0,
+            "avg_length": None,
+            "unique_keywords": 0,
+        }
+        if not entries:
+            return stats
+        total_length = 0
+        first_ts = entries[0].timestamp
+        last_ts = entries[-1].timestamp
+        stats["duration"] = max(0.0, (last_ts - first_ts).total_seconds())
+        keyword_counts: Dict[str, int] = {}
+        for entry in entries:
+            total_length += len(entry.text)
+            if entry.level == "error":
+                stats["errors"] += 1
+                stats["last_error"] = entry.text
+            elif entry.level == "warning":
+                stats["warnings"] += 1
+                stats["last_warning"] = entry.text
+            else:
+                stats["infos"] += 1
+            matches = POINTS_PATTERN.findall(entry.text)
+            if matches:
+                stats["points_total"] += sum(float(val.replace(",", ".")) for val in matches)
+            for keyword in entry.keywords:
+                keyword_counts[keyword] = keyword_counts.get(keyword, 0) + 1
+                spec = KEYWORD_SPEC_BY_NAME.get(keyword)
+                if spec:
+                    stats["last_keyword"] = spec.label
+        stats["keyword_counts"] = keyword_counts
+        stats["unique_keywords"] = len(keyword_counts)
+        if stats["total"]:
+            stats["avg_length"] = total_length / stats["total"]
+        for key in ("last_message", "last_error", "last_warning"):
+            value = stats.get(key)
+            if isinstance(value, str) and len(value) > 120:
+                stats[key] = value[:117] + "…"
+        return stats
+
+    def build_summary_text(stats: Dict[str, object]) -> str:
+        parts: List[str] = []
+        for name in SUMMARY_FEATURE_NAMES:
+            if not advanced_feature_vars.get(name) or not advanced_feature_vars[name].get():
+                continue
+            feature = GUI_FEATURE_BY_NAME.get(name)
+            if not feature:
+                continue
+            renderer = SUMMARY_RENDERERS.get(feature.payload)
+            if renderer:
+                piece = renderer(stats)
+                if piece:
+                    parts.append(piece)
+        if not parts:
+            return L("ui_summary_placeholder")
+        return " | ".join(parts)
+
+    beta_button_defaults = {
+        btn: {
+            "corner_radius": btn.cget("corner_radius"),
+            "border_width": btn.cget("border_width"),
+            "width": btn.cget("width"),
+        }
+        for btn in [
+            start_btn,
+            select_all_btn,
+            select_none_btn,
+            restore_defaults_btn,
+            import_btn,
+            export_btn,
+            collapse_btn,
+            lic_check_btn,
+            lic_end_btn,
+            log_clear_btn,
+            log_copy_btn,
+            log_save_btn,
+        ]
+    }
+    default_log_height = 240
+    default_log_fg = log_box.cget("fg_color")
+    beta_default_fg = beta_tools.cget("fg_color")
+    beta_default_corner = beta_tools.cget("corner_radius")
+    advanced_default_fg = advanced_tools.cget("fg_color")
+    advanced_default_corner = advanced_tools.cget("corner_radius")
+    frame_default_padding = {
+        cred: (12, 8),
+        lic_frame: (12, 8),
+        opts: (12, 8),
+        lang_frame: (12, 4),
+        beta_tools: (12, 8),
+        advanced_tools: (12, 8),
+    }
+    header_default_font = header.cget("font")
+    beta_title_default_font = beta_title.cget("font")
+    advanced_title_default_font = advanced_title.cget("font")
+    start_btn_default_width = start_btn.cget("width")
+    start_btn_default_corner = start_btn.cget("corner_radius")
+
+    def apply_layout_features() -> None:
+        log_box.configure(height=default_log_height, fg_color=default_log_fg)
+        beta_tools.configure(fg_color=beta_default_fg, corner_radius=beta_default_corner)
+        advanced_tools.configure(fg_color=advanced_default_fg, corner_radius=advanced_default_corner)
+        header.configure(font=header_default_font)
+        beta_title.configure(font=beta_title_default_font)
+        advanced_title.configure(font=advanced_title_default_font)
+        for frame, (padx, pady) in frame_default_padding.items():
+            frame.grid_configure(padx=padx, pady=pady)
+        for btn, defaults in beta_button_defaults.items():
+            try:
+                btn.configure(
+                    corner_radius=defaults.get("corner_radius"),
+                    border_width=defaults.get("border_width"),
+                    width=defaults.get("width"),
+                )
+            except Exception:
+                pass
+        start_btn.configure(width=start_btn_default_width, corner_radius=start_btn_default_corner)
+        if advanced_feature_vars.get("layout_expand_log_height") and advanced_feature_vars["layout_expand_log_height"].get():
+            log_box.configure(height=320)
+        if advanced_feature_vars.get("layout_compact_panels") and advanced_feature_vars["layout_compact_panels"].get():
+            for frame in frame_default_padding:
+                frame.grid_configure(padx=6, pady=4)
+        if advanced_feature_vars.get("layout_bold_headers") and advanced_feature_vars["layout_bold_headers"].get():
+            header.configure(font=("Arial", 22, "bold"))
+            beta_title.configure(font=("Arial", 17, "bold"))
+            advanced_title.configure(font=("Arial", 17, "bold"))
+        if advanced_feature_vars.get("layout_wide_buttons") and advanced_feature_vars["layout_wide_buttons"].get():
+            try:
+                start_btn.configure(width=(start_btn_default_width or 120) + 40)
+            except Exception:
+                pass
+        if advanced_feature_vars.get("layout_highlight_beta_panel") and advanced_feature_vars["layout_highlight_beta_panel"].get():
+            beta_tools.configure(fg_color=("#1f3b64", "#14284b"))
+        if advanced_feature_vars.get("layout_highlight_advanced_panel") and advanced_feature_vars["layout_highlight_advanced_panel"].get():
+            advanced_tools.configure(fg_color=("#2c2d45", "#1a1b2b"))
+        if advanced_feature_vars.get("layout_highlight_log_panel") and advanced_feature_vars["layout_highlight_log_panel"].get():
+            log_box.configure(fg_color=("#1c1c1c", "#0f0f0f"))
+        if advanced_feature_vars.get("layout_round_controls") and advanced_feature_vars["layout_round_controls"].get():
+            for frame in (cred, lic_frame, opts, lang_frame, beta_tools, advanced_tools):
+                try:
+                    frame.configure(corner_radius=18)
+                except Exception:
+                    pass
+        if advanced_feature_vars.get("layout_dim_background") and advanced_feature_vars["layout_dim_background"].get():
+            for frame in (cred, lic_frame, opts, lang_frame):
+                try:
+                    frame.configure(fg_color=("#262626", "#151515"))
+                except Exception:
+                    pass
+        if advanced_feature_vars.get("layout_flat_buttons") and advanced_feature_vars["layout_flat_buttons"].get():
+            for btn in beta_button_defaults:
+                try:
+                    btn.configure(corner_radius=4, border_width=0)
+                except Exception:
+                    pass
+
+    def on_advanced_feature_toggle(name: str) -> None:
+        feature = GUI_FEATURE_BY_NAME.get(name)
+        if not feature:
+            return
+        if feature.kind in {"prefix", "suffix", "transform", "filter", "keyword-highlight", "keyword-filter", "summary"}:
+            refresh_log_display()
+        elif feature.kind == "layout":
+            apply_layout_features()
+
+    action_handlers: Dict[str, Callable[[GuiLogEntry], None]] = {}
+
+    def register_action(payload: str, func: Callable[[GuiLogEntry], None]) -> None:
+        action_handlers[payload] = func
+
+    def safe_bell() -> None:
+        try:
+            app.bell()
+        except Exception:
+            pass
+
+    register_action(
+        "beep_error",
+        lambda entry: safe_bell() if entry.level == "error" else None,
+    )
+    register_action(
+        "beep_warning",
+        lambda entry: safe_bell() if entry.level == "warning" else None,
+    )
+    register_action(
+        "beep_cycle",
+        lambda entry: safe_bell() if "cycle" in entry.text.lower() else None,
+    )
+
+    def copy_to_clipboard(entry: GuiLogEntry) -> None:
+        try:
+            app.clipboard_clear()
+            app.clipboard_append(entry.text)
+        except Exception:
+            pass
+
+    register_action(
+        "copy_error",
+        lambda entry: copy_to_clipboard(entry) if entry.level == "error" else None,
+    )
+    register_action(
+        "copy_gpt",
+        lambda entry: copy_to_clipboard(entry) if "gpt" in entry.text.lower() else None,
+    )
+    register_action(
+        "copy_done",
+        lambda entry: copy_to_clipboard(entry) if "done" in entry.text.lower() else None,
+    )
+    register_action(
+        "focus_error",
+        lambda entry: app.after(0, lambda: (app.lift(), app.focus_force())) if entry.level == "error" else None,
+    )
+    register_action(
+        "pause_error",
+        lambda entry: log_pause_var.set(True) if entry.level == "error" else None,
+    )
+    register_action(
+        "wrap_long",
+        lambda entry: log_wrap_var.set(True) if len(entry.text) > 140 else None,
+    )
+
+    def handle_log_actions(entry: GuiLogEntry) -> None:
+        for name in ACTION_FEATURE_NAMES:
+            if not advanced_feature_vars.get(name) or not advanced_feature_vars[name].get():
+                continue
+            feature = GUI_FEATURE_BY_NAME.get(name)
+            if not feature:
+                continue
+            handler = action_handlers.get(feature.payload)
+            if handler:
+                handler(entry)
 
     def refresh_log_display() -> None:
-        lines = get_filtered_lines()
+        entries = get_visible_entries()
+        rendered = render_entries(entries)
         log_box.configure(state="normal")
         log_box.delete("1.0", "end")
         wrap_mode = "word" if log_wrap_var.get() else "none"
         log_box.configure(wrap=wrap_mode)
         log_box.configure(font=("Consolas", int(log_font_var.get())))
-        for ts, text in lines:
-            display = text
-            if log_timestamp_var.get():
-                display = f"[{ts.strftime('%H:%M:%S')}] {text}"
+        for entry, display in zip(entries, rendered):
             start_index = log_box.index("end-1c")
             log_box.insert("end", display + "\n")
             end_index = log_box.index("end-1c")
             if log_highlight_var.get():
-                lower_text = text.lower()
-                if "❌" in text or "error" in lower_text:
+                if entry.level == "error":
                     log_box.tag_add("error", start_index, end_index)
-                elif "⚠" in text or "warn" in lower_text:
+                elif entry.level == "warning":
                     log_box.tag_add("warning", start_index, end_index)
         log_box.configure(state="disabled")
         if log_autoscroll_var.get():
             log_box.see("end")
+        stats = compute_log_stats(entries)
+        log_summary_label.configure(text=build_summary_text(stats))
 
-    def append_log(m: str):
-        log_queue.put((datetime.now(), m))
+    def append_log(message: str) -> None:
+        log_queue.put(
+            GuiLogEvent(
+                timestamp=datetime.now(),
+                text=message,
+                thread_name=threading.current_thread().name,
+                thread_id=threading.get_ident() or 0,
+            )
+        )
 
     def flush_pending() -> None:
-        if not log_pause_var.get() and pending_logs:
-            log_history.extend(pending_logs)
-            pending_logs.clear()
-            refresh_log_display()
+        nonlocal log_first_timestamp
+        if log_pause_var.get() or not pending_logs:
+            return
+        if not log_history and pending_logs:
+            log_first_timestamp = pending_logs[0].timestamp
+        for entry in pending_logs:
+            log_history.append(entry)
+            handle_log_actions(entry)
+        pending_logs.clear()
+        refresh_log_display()
 
-    def process_queue():
+    def process_queue() -> None:
+        nonlocal log_sequence_counter, log_first_timestamp
         try:
             while True:
-                ts, message = log_queue.get_nowait()
+                event = log_queue.get_nowait()
+                if is_action_enabled("clear_cycle") and "cycle" in event.text.lower():
+                    log_history.clear()
+                    pending_logs.clear()
+                    log_sequence_counter = itertools.count(1)
+                    log_first_timestamp = None
+                sequence = next(log_sequence_counter)
+                entry = GuiLogEntry(
+                    timestamp=event.timestamp,
+                    text=event.text,
+                    thread_name=event.thread_name,
+                    thread_id=event.thread_id,
+                    sequence=sequence,
+                    level=detect_log_level(event.text),
+                    keywords=match_keywords(event.text),
+                )
                 if log_pause_var.get():
-                    pending_logs.append((ts, message))
+                    pending_logs.append(entry)
                 else:
-                    log_history.append((ts, message))
+                    if not log_history:
+                        log_first_timestamp = entry.timestamp
+                    log_history.append(entry)
+                    handle_log_actions(entry)
                     refresh_log_display()
         except queue.Empty:
             pass
         app.after(100, process_queue)
 
     def on_clear_log() -> None:
+        nonlocal log_sequence_counter, log_first_timestamp
         log_history.clear()
         pending_logs.clear()
+        log_sequence_counter = itertools.count(1)
+        log_first_timestamp = None
         refresh_log_display()
 
     def on_copy_log() -> None:
-        lines = get_filtered_lines()
-        rendered = [f"[{ts.strftime('%H:%M:%S')}] {text}" if log_timestamp_var.get() else text for ts, text in lines]
+        entries = get_visible_entries()
+        rendered = render_entries(entries)
+        if log_timestamp_var.get():
+            rendered = [f"[{entry.timestamp.strftime('%H:%M:%S')}] {text}" for entry, text in zip(entries, rendered)]
         try:
             app.clipboard_clear()
             app.clipboard_append("\n".join(rendered))
@@ -2515,8 +3516,10 @@ def run_customtkinter_ui(ctk, default_lang: str = "lv", debug_default: bool = Fa
             pass
 
     def on_save_log() -> None:
-        lines = get_filtered_lines()
-        rendered = [f"[{ts.strftime('%H:%M:%S')}] {text}" if log_timestamp_var.get() else text for ts, text in lines]
+        entries = get_visible_entries()
+        rendered = render_entries(entries)
+        if log_timestamp_var.get():
+            rendered = [f"[{entry.timestamp.strftime('%H:%M:%S')}] {text}" for entry, text in zip(entries, rendered)]
         path = filedialog.asksaveasfilename(
             defaultextension=".txt",
             filetypes=[("Text", "*.txt"), ("JSON", "*.json"), ("All", "*.*")],
@@ -2529,10 +3532,10 @@ def run_customtkinter_ui(ctk, default_lang: str = "lv", debug_default: bool = Fa
                     json.dump(
                         [
                             {
-                                "timestamp": ts.isoformat(),
+                                "timestamp": entry.timestamp.isoformat(),
                                 "message": text,
                             }
-                            for ts, text in lines
+                            for entry, text in zip(entries, rendered)
                         ],
                         fh,
                         ensure_ascii=False,
@@ -2547,6 +3550,7 @@ def run_customtkinter_ui(ctk, default_lang: str = "lv", debug_default: bool = Fa
     log_clear_btn.configure(command=on_clear_log)
     log_copy_btn.configure(command=on_copy_log)
     log_save_btn.configure(command=on_save_log)
+    apply_layout_features()
 
     def apply_log_font(value: float) -> None:
         try:
@@ -2947,6 +3951,14 @@ def run_customtkinter_ui(ctk, default_lang: str = "lv", debug_default: bool = Fa
         import_btn.configure(text=L("ui_import"))
         export_btn.configure(text=L("ui_export"))
         collapse_btn.configure(text=L("ui_expand") if collapsed_state["collapsed"] else L("ui_collapse"))
+        advanced_title.configure(text=L("ui_advanced_features"))
+        advanced_hint.configure(text=L("ui_advanced_hint"))
+        for category, key in tab_translations.items():
+            try:
+                advanced_tabs._tab_dict[category]["text_label"].configure(text=L(key))
+            except Exception:
+                pass
+        log_summary_label.configure(text=L("ui_summary_placeholder"))
         refresh_beta_filter()
         update_beta_count()
         start_btn.configure(text=L("ui_start"))
@@ -2955,6 +3967,7 @@ def run_customtkinter_ui(ctk, default_lang: str = "lv", debug_default: bool = Fa
         lic_status.configure(text=L("status") + ": —")
         lic_user_entry.configure(placeholder_text=L("ui_license_user_ph"))
         lic_key_entry.configure(placeholder_text=L("ui_license_key_ph"))
+        apply_layout_features()
 
         old_map = theme_map_ref["map"]
         current_actual = old_map.get(theme_var.get(), "system")

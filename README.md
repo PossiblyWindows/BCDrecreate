@@ -105,7 +105,7 @@ The beta flag unlocks 52 automation optimisations and quality-of-life upgrades:
 
 ### GUI control suite
 
-On top of the automation improvements, the GUI now delivers another 74 interface-level features, bringing the combined total to 126 capabilities:
+On top of the automation improvements, the GUI now delivers 283 interface-level features, bringing the combined total to 335 capabilities:
 
 53. Theme switcher (system / light / dark appearance modes).
 54. Accent colour picker with blue, dark-blue, green, teal, red, purple, and orange presets.
@@ -184,3 +184,215 @@ On top of the automation improvements, the GUI now delivers another 74 interface
 
 All beta statistics are printed once the run finishes so you can quickly gauge how many tasks were solved, total points gained,
 skips, Top gain, and which user ID was active.
+
+### Advanced GUI catalogue
+
+127. Prefix toggle: millisecond timestamps in the log viewer.
+128. Prefix toggle: HH:MM:SS timestamps.
+129. Prefix toggle: YYYY-MM-DD date stamps.
+130. Prefix toggle: weekday labels for each entry.
+131. Prefix toggle: ISO8601 timestamps.
+132. Prefix toggle: delta from the previous log line.
+133. Prefix toggle: elapsed time since the first captured log.
+134. Prefix toggle: sequential log numbering.
+135. Prefix toggle: emitting thread name.
+136. Prefix toggle: emitting thread identifier.
+137. Prefix toggle: log level banner.
+138. Prefix toggle: primary keyword label.
+139. Prefix toggle: active language code.
+140. Prefix toggle: beta state summary (on/off with counts).
+141. Suffix toggle: message length characters.
+142. Suffix toggle: message word count.
+143. Suffix toggle: total character count.
+144. Suffix toggle: digit sum indicator.
+145. Suffix toggle: numeric token echo.
+146. Suffix toggle: points estimate accumulator.
+147. Suffix toggle: keyword match count.
+148. Suffix toggle: rendered index number.
+149. Suffix toggle: elapsed minutes since the first entry.
+150. Suffix toggle: elapsed seconds since the first entry.
+151. Suffix toggle: thread marker suffix.
+152. Suffix toggle: short hash fingerprint.
+153. Suffix toggle: cycle marker flag.
+154. Suffix toggle: summary pointer badge.
+155. Transform toggle: uppercase error lines.
+156. Transform toggle: uppercase warning lines.
+157. Transform toggle: lowercase informational lines.
+158. Transform toggle: title-case formatter.
+159. Transform toggle: highlight numeric tokens.
+160. Transform toggle: emphasise tracked keywords inline.
+161. Transform toggle: rename “points” to “pts”.
+162. Transform toggle: pad bracketed expressions.
+163. Transform toggle: collapse repeated whitespace.
+164. Transform toggle: indent multi-line entries.
+165. Transform toggle: bullet prefix decoration.
+166. Transform toggle: capitalise the first character.
+167. Wrapper toggle: surround entries with brackets.
+168. Wrapper toggle: surround entries with « » chevrons.
+169. Wrapper toggle: surround entries with pipes.
+170. Wrapper toggle: surround entries with stars.
+171. Wrapper toggle: surround entries with box-drawing glyphs.
+172. Wrapper toggle: surround entries with wave markers.
+173. Filter toggle: show only errors and warnings.
+174. Filter toggle: show strictly errors.
+175. Filter toggle: show only warnings.
+176. Filter toggle: hide informational lines.
+177. Filter toggle: hide success completions.
+178. Filter toggle: hide ChatGPT chatter.
+179. Filter toggle: hide license updates.
+180. Filter toggle: hide prefetch telemetry.
+181. Filter toggle: hide cycle markers.
+182. Filter toggle: hide duplicate messages.
+183. Action toggle: audio alert on errors.
+184. Action toggle: audio alert on warnings.
+185. Action toggle: audio alert on cycle markers.
+186. Action toggle: copy errors to clipboard automatically.
+187. Action toggle: copy ChatGPT replies to clipboard.
+188. Action toggle: copy completion lines to clipboard.
+189. Action toggle: focus the GUI when errors appear.
+190. Action toggle: pause log intake on errors.
+191. Action toggle: clear the log when a new cycle begins.
+192. Action toggle: enable wrapping for very long messages.
+193. Layout toggle: expand the log panel height.
+194. Layout toggle: compact panel padding.
+195. Layout toggle: bolden section headers.
+196. Layout toggle: widen control buttons.
+197. Layout toggle: highlight the beta panel.
+198. Layout toggle: highlight the advanced panel.
+199. Layout toggle: highlight the log panel background.
+200. Layout toggle: round the control frames.
+201. Layout toggle: dim panel backgrounds.
+202. Layout toggle: flatten the control buttons.
+203. Summary toggle: show total log lines.
+204. Summary toggle: show error count.
+205. Summary toggle: show warning count.
+206. Summary toggle: show info count.
+207. Summary toggle: last message snippet.
+208. Summary toggle: last error snippet.
+209. Summary toggle: last warning snippet.
+210. Summary toggle: last highlighted keyword.
+211. Summary toggle: GPT mention counter.
+212. Summary toggle: cycle mention counter.
+213. Summary toggle: task mention counter.
+214. Summary toggle: subject mention counter.
+215. Summary toggle: retry mention counter.
+216. Summary toggle: skip mention counter.
+217. Summary toggle: prefetch mention counter.
+218. Summary toggle: license mention counter.
+219. Summary toggle: total numeric points.
+220. Summary toggle: log duration span.
+221. Summary toggle: average message length.
+222. Summary toggle: unique keyword counter.
+223. Summary toggle: completion mention counter.
+224. Highlight toggle: Login flow events.
+225. Highlight toggle: Cookie banner handling.
+226. Highlight toggle: ChatGPT interactions.
+227. Highlight toggle: Subject picks.
+228. Highlight toggle: Topic picks.
+229. Highlight toggle: Task flow.
+230. Highlight toggle: Points notices.
+231. Highlight toggle: Top score updates.
+232. Highlight toggle: Skip tracking.
+233. Highlight toggle: Retry notices.
+234. Highlight toggle: Cycle changes.
+235. Highlight toggle: License chatter.
+236. Highlight toggle: Trial messaging.
+237. Highlight toggle: Debug output.
+238. Highlight toggle: Completion confirmations.
+239. Highlight toggle: Submission states.
+240. Highlight toggle: Cookie declines.
+241. Highlight toggle: HTTP diagnostics.
+242. Highlight toggle: Prefetch telemetry.
+243. Highlight toggle: Remote probe notes.
+244. Highlight toggle: Driver status.
+245. Highlight toggle: Chrome lifecycle.
+246. Highlight toggle: Session changes.
+247. Highlight toggle: Metrics analysis.
+248. Highlight toggle: Summary emissions.
+249. Highlight toggle: Dropdown handling.
+250. Highlight toggle: Input field handling.
+251. Highlight toggle: Selection handling.
+252. Highlight toggle: Submit handling.
+253. Highlight toggle: Automation status.
+254. Highlight toggle: Cache management.
+255. Highlight toggle: Probe diagnostics.
+256. Highlight toggle: Radix overlay handling.
+257. Highlight toggle: Watchdog resets.
+258. Highlight toggle: Parallelism logs.
+259. Highlight toggle: Queue status.
+260. Highlight toggle: Thread markers.
+261. Highlight toggle: Restart notices.
+262. Highlight toggle: Rebuild notices.
+263. Highlight toggle: Sync activity.
+264. Highlight toggle: Filter adjustments.
+265. Highlight toggle: Highlight adjustments.
+266. Highlight toggle: Export operations.
+267. Highlight toggle: Import operations.
+268. Highlight toggle: Preset management.
+269. Highlight toggle: Credential operations.
+270. Highlight toggle: Beta lifecycle.
+271. Highlight toggle: Feature toggles.
+272. Highlight toggle: Until-target tracking.
+273. Highlight toggle: Gain tracking.
+274. Filter toggle: show only Login flow lines.
+275. Filter toggle: show only Cookie banner lines.
+276. Filter toggle: show only ChatGPT lines.
+277. Filter toggle: show only Subject pick lines.
+278. Filter toggle: show only Topic pick lines.
+279. Filter toggle: show only Task flow lines.
+280. Filter toggle: show only Points lines.
+281. Filter toggle: show only Top score lines.
+282. Filter toggle: show only Skip lines.
+283. Filter toggle: show only Retry lines.
+284. Filter toggle: show only Cycle lines.
+285. Filter toggle: show only License lines.
+286. Filter toggle: show only Trial lines.
+287. Filter toggle: show only Debug lines.
+288. Filter toggle: show only Completion lines.
+289. Filter toggle: show only Submission lines.
+290. Filter toggle: show only Cookie decline lines.
+291. Filter toggle: show only HTTP lines.
+292. Filter toggle: show only Prefetch lines.
+293. Filter toggle: show only Remote probe lines.
+294. Filter toggle: show only Driver lines.
+295. Filter toggle: show only Chrome lines.
+296. Filter toggle: show only Session lines.
+297. Filter toggle: show only Metrics lines.
+298. Filter toggle: show only Summary lines.
+299. Filter toggle: show only Dropdown lines.
+300. Filter toggle: show only Input lines.
+301. Filter toggle: show only Selection lines.
+302. Filter toggle: show only Submit lines.
+303. Filter toggle: show only Automation lines.
+304. Filter toggle: show only Cache lines.
+305. Filter toggle: show only Probe lines.
+306. Filter toggle: show only Radix lines.
+307. Filter toggle: show only Watchdog lines.
+308. Filter toggle: show only Parallelism lines.
+309. Filter toggle: show only Queue lines.
+310. Filter toggle: show only Thread lines.
+311. Filter toggle: show only Restart lines.
+312. Filter toggle: show only Rebuild lines.
+313. Filter toggle: show only Sync lines.
+314. Filter toggle: show only Filter-change lines.
+315. Filter toggle: show only Highlight-change lines.
+316. Filter toggle: show only Export lines.
+317. Filter toggle: show only Import lines.
+318. Filter toggle: show only Preset lines.
+319. Filter toggle: show only Credential lines.
+320. Filter toggle: show only Beta lifecycle lines.
+321. Filter toggle: show only Feature toggle lines.
+322. Filter toggle: show only Until-target lines.
+323. Filter toggle: show only Gain tracking lines.
+324. Highlight toggle: Performance updates.
+325. Highlight toggle: Stability notices.
+326. Highlight toggle: Interface adjustments.
+327. Highlight toggle: Theme tweaks.
+328. Highlight toggle: History entries.
+329. Highlight toggle: Overview summaries.
+330. Filter toggle: show only Performance lines.
+331. Filter toggle: show only Stability lines.
+332. Filter toggle: show only Interface lines.
+333. Filter toggle: show only Theme lines.
+334. Filter toggle: show only History lines.
+335. Filter toggle: show only Overview lines.
