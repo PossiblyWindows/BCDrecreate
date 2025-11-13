@@ -9,6 +9,7 @@ import hashlib
 import platform
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
+from datetime import datetime
 from functools import lru_cache
 from typing import Callable, Dict, List, Optional, Set, Tuple
 from urllib.parse import urljoin, urlsplit
@@ -124,6 +125,25 @@ I18N = {
         "ui_license_key_ph": "XXXXXX-XXXXXX-XXXXXX-XXXXXX-XXXXXX-XXXXXX",
         "ui_check_license": "Pārbaudīt licenci",
         "ui_end_trial": "Beigt izmēģinājumu un izmantot licenci",
+        "ui_gui_tools": "GUI rīki",
+        "ui_theme": "Tēma",
+        "ui_theme_system": "Sistēma",
+        "ui_theme_light": "Gaiša",
+        "ui_theme_dark": "Tumša",
+        "ui_accent": "Akcenta krāsa",
+        "ui_log_tools": "Žurnāla vadīklas",
+        "ui_log_wrap": "Rindkopu aplaušana",
+        "ui_log_autoscroll": "Automātiskā ritināšana",
+        "ui_log_pause": "Pauzēt atjauninājumus",
+        "ui_log_clear": "Notīrīt",
+        "ui_log_copy": "Kopēt",
+        "ui_log_save": "Saglabāt…",
+        "ui_log_filter": "Filtrēt žurnālu",
+        "ui_log_highlight": "Izcelt kļūdas",
+        "ui_log_timestamp": "Pievienot laikspiedogu",
+        "ui_widget_scaling": "UI mērogs",
+        "ui_log_font": "Žurnāla fonts",
+        "ui_log_saved": "Žurnāls saglabāts.",
         "ui_trial_left": "Atlicis izmēģinājuma laiks: {h}:{m:02d}:{s:02d}",
         "ui_trial_expired": "Izmēģinājums beidzies — nepieciešama licence.",
         "ui_licensed": "Licencēts: {u}",
@@ -132,6 +152,20 @@ I18N = {
         "ui_popup_btn_ok": "Apstiprināt",
         "ui_popup_btn_cancel": "Atcelt",
         "ui_remember": "Saglabāt pierakstīšanās datus",
+        "ui_beta_features": "Beta funkciju pārslēgšana",
+        "ui_beta_feature_hint": "Katru beta iespēju var ieslēgt vai izslēgt individuāli.",
+        "ui_beta_feature_search": "Meklēt",
+        "ui_select_all": "Ieslēgt visas",
+        "ui_select_none": "Izslēgt visas",
+        "ui_restore_defaults": "Atjaunot noklusējumus",
+        "ui_import": "Importēt",
+        "ui_export": "Eksportēt",
+        "ui_collapse": "Sakļaut",
+        "ui_expand": "Izvērst",
+        "ui_feature_count": "Ieslēgts: {a}/{b}",
+        "ui_beta_feature_saved": "Presets saglabāts.",
+        "ui_beta_feature_loaded": "Presets ielādēts.",
+        "ui_beta_feature_error": "Neizdevās apstrādāt presetu: {e}",
         # Prompt for ChatGPT
         "p1": "Tu esi asistents, kas risina uzdevumi.lv testus un sniedz tikai galīgo atbildi.",
         "p2": "Tev tiek dota #taskhtml > div teksta satura kopija. Analizē to un sagatavo risinājumu.",
@@ -212,6 +246,25 @@ I18N = {
         "ui_license_key_ph": "XXXXXX-XXXXXX-XXXXXX-XXXXXX-XXXXXX-XXXXXX",
         "ui_check_license": "Check license",
         "ui_end_trial": "End trial and use license",
+        "ui_gui_tools": "GUI tools",
+        "ui_theme": "Theme",
+        "ui_theme_system": "System",
+        "ui_theme_light": "Light",
+        "ui_theme_dark": "Dark",
+        "ui_accent": "Accent color",
+        "ui_log_tools": "Log controls",
+        "ui_log_wrap": "Wrap lines",
+        "ui_log_autoscroll": "Auto-scroll",
+        "ui_log_pause": "Pause updates",
+        "ui_log_clear": "Clear",
+        "ui_log_copy": "Copy",
+        "ui_log_save": "Save…",
+        "ui_log_filter": "Filter logs",
+        "ui_log_highlight": "Highlight errors",
+        "ui_log_timestamp": "Add timestamps",
+        "ui_widget_scaling": "UI scale",
+        "ui_log_font": "Log font size",
+        "ui_log_saved": "Log saved.",
         "ui_trial_left": "Trial time left: {h}:{m:02d}:{s:02d}",
         "ui_trial_expired": "Trial expired — license required.",
         "ui_licensed": "Licensed: {u}",
@@ -220,6 +273,20 @@ I18N = {
         "ui_popup_btn_ok": "Confirm",
         "ui_popup_btn_cancel": "Cancel",
         "ui_remember": "Remember credentials",
+        "ui_beta_features": "Beta feature toggles",
+        "ui_beta_feature_hint": "Enable or disable each experimental capability individually.",
+        "ui_beta_feature_search": "Search",
+        "ui_select_all": "Enable all",
+        "ui_select_none": "Disable all",
+        "ui_restore_defaults": "Restore defaults",
+        "ui_import": "Import",
+        "ui_export": "Export",
+        "ui_collapse": "Collapse",
+        "ui_expand": "Expand",
+        "ui_feature_count": "Enabled: {a}/{b}",
+        "ui_beta_feature_saved": "Preset saved.",
+        "ui_beta_feature_loaded": "Preset loaded.",
+        "ui_beta_feature_error": "Failed to process preset: {e}",
         "p1": "You are an assistant solving uzdevumi.lv tasks and you must output only the final answer.",
         "p2": "You are given the text content of #taskhtml > div. Analyze and produce the solution.",
         "p3": "Answer format:",
@@ -298,6 +365,25 @@ I18N = {
         "ui_license_key_ph": "XXXXXX-XXXXXX-XXXXXX-XXXXXX-XXXXXX-XXXXXX",
         "ui_check_license": "Проверить лицензию",
         "ui_end_trial": "Завершить пробный период и использовать лицензию",
+        "ui_gui_tools": "Настройки GUI",
+        "ui_theme": "Тема",
+        "ui_theme_system": "Системная",
+        "ui_theme_light": "Светлая",
+        "ui_theme_dark": "Тёмная",
+        "ui_accent": "Цвет акцента",
+        "ui_log_tools": "Управление логом",
+        "ui_log_wrap": "Перенос строк",
+        "ui_log_autoscroll": "Автопрокрутка",
+        "ui_log_pause": "Пауза обновлений",
+        "ui_log_clear": "Очистить",
+        "ui_log_copy": "Копировать",
+        "ui_log_save": "Сохранить…",
+        "ui_log_filter": "Фильтр лога",
+        "ui_log_highlight": "Подсветка ошибок",
+        "ui_log_timestamp": "Добавлять время",
+        "ui_widget_scaling": "Масштаб UI",
+        "ui_log_font": "Размер шрифта лога",
+        "ui_log_saved": "Лог сохранён.",
         "ui_trial_left": "Осталось времени пробного периода: {h}:{m:02d}:{s:02d}",
         "ui_trial_expired": "Пробный период истёк — требуется лицензия.",
         "ui_licensed": "Лицензировано: {u}",
@@ -306,6 +392,20 @@ I18N = {
         "ui_popup_btn_ok": "Подтвердить",
         "ui_popup_btn_cancel": "Отмена",
         "ui_remember": "Запомнить данные для входа",
+        "ui_beta_features": "Переключатели beta-функций",
+        "ui_beta_feature_hint": "Каждую экспериментальную возможность можно включить или выключить отдельно.",
+        "ui_beta_feature_search": "Поиск",
+        "ui_select_all": "Включить все",
+        "ui_select_none": "Выключить все",
+        "ui_restore_defaults": "Сбросить по умолчанию",
+        "ui_import": "Импорт",
+        "ui_export": "Экспорт",
+        "ui_collapse": "Свернуть",
+        "ui_expand": "Развернуть",
+        "ui_feature_count": "Включено: {a}/{b}",
+        "ui_beta_feature_saved": "Профиль сохранён.",
+        "ui_beta_feature_loaded": "Профиль загружен.",
+        "ui_beta_feature_error": "Не удалось обработать профиль: {e}",
         "p1": "Вы — ассистент, решающий задания uzdevumi.lv, выводите только окончательный ответ.",
         "p2": "Дан текст содержимого #taskhtml > div. Проанализируйте и дайте решение.",
         "p3": "Формат ответа:",
@@ -466,13 +566,77 @@ BETA_FEATURE_NAMES = [
 ]
 
 
+BETA_FEATURE_LABELS: Dict[str, str] = {
+    "translation_cache": "Cache translations",
+    "regex_cache": "Reuse compiled regexes",
+    "cached_subjects": "Cache subject catalog",
+    "cookie_guard": "Decline cookie banners once",
+    "driver_acceleration": "Accelerated Chrome launch flags",
+    "wait_optimization": "Faster Selenium waits",
+    "gpt_refresh_strategy": "Adaptive ChatGPT refresh",
+    "gpt_prompt_cache": "Cached prompt headers",
+    "parse_answer_fallbacks": "Extra answer parsing fallbacks",
+    "dropdown_selection_guard": "Dropdown guardrails",
+    "text_input_normalization": "Normalize text inputs",
+    "structured_logging": "Structured beta logging",
+    "metrics_reporting": "Beta metrics reporting",
+    "auto_recovery_backoff": "Driver recovery backoff",
+    "subject_rotation": "Avoid repeating subjects",
+    "top_tracking_enhancements": "Enhanced Top tracking",
+    "credential_memory": "Remember credential user ID",
+    "safe_submit": "Safe submit button handling",
+    "skip_zero_point_tasks": "Skip zero-point tasks",
+    "subject_prefetch": "Subject prefetch cache",
+    "parallel_task_prefetch": "Parallel HTTP prefetch",
+    "remote_media_probe": "Remote media probe",
+    "high_value_retry": "High-value smart retry",
+    "feedback_scanner": "Submission feedback scanner",
+    "gpt_prompt_variation": "Prompt variation on retries",
+    "gpt_radix_link_support": "Radix overlay auto-click",
+    "gpt_session_watchdog": "ChatGPT session watchdog",
+    "gpt_button_retry": "Send-button retry guard",
+    "driver_cookie_sync": "Sync cookies to HTTP client",
+    "user_agent_hinting": "User-Agent hints for probes",
+    "prefetch_logging": "Prefetch telemetry logging",
+    "dropdown_resilience": "Re-acquire stale dropdowns",
+    "text_response_tokenizer": "Tokenize free-form answers",
+    "numeric_answer_normalizer": "Unify decimal separators",
+    "answer_mode_detection": "Auto answer-mode detection",
+    "submission_feedback_analytics": "Feedback analytics",
+    "top_snapshot_history": "Top snapshot history",
+    "task_skip_counter": "Skip counter",
+    "retry_prompt_backoff": "Retry prompt backoff",
+    "parallel_executor_pool": "Dedicated executor pool",
+    "http_probe_timeout": "HTTP probe timeouts",
+    "radix_resilience": "Radix selector resilience",
+    "page_refresh_guard": "Reapply CSS after refresh",
+    "task_summary_logging": "Task summary logging",
+    "ui_placeholder_sync": "Live placeholder localisation",
+    "license_status_polling": "GUI license polling",
+    "credential_vault": "Credential vault integration",
+    "remote_probe_fallback": "Fallback when probes fail",
+    "task_loop_metrics": "Task loop metrics",
+    "scoped_logging_filters": "Scoped logging hooks",
+    "automation_health_checks": "Automation health checks",
+    "smart_sleep_reduction": "Reduced sleep delays",
+}
+
+
 BETA_STATE: Optional[BetaState] = None
 
 
-def activate_beta() -> BetaState:
+def activate_beta(overrides: Optional[Dict[str, bool]] = None) -> BetaState:
     global BETA_STATE
     state = BetaState(enabled=True)
-    state.features = list(BETA_FEATURE_NAMES)
+    features: List[str] = []
+    for name in BETA_FEATURE_NAMES:
+        value = getattr(state.config, name, False)
+        if overrides and name in overrides:
+            value = overrides[name]
+            setattr(state.config, name, value)
+        if value:
+            features.append(name)
+    state.features = features
     BETA_STATE = state
     return state
 
@@ -1947,8 +2111,9 @@ def run_automation(
     license_key: Optional[str] = None,
     force_keysys: bool = False,
     beta_mode: bool = False,
+    beta_overrides: Optional[Dict[str, bool]] = None,
 ) -> None:
-    beta_state: Optional[BetaState] = activate_beta() if beta_mode else None
+    beta_state: Optional[BetaState] = activate_beta(beta_overrides) if beta_mode else None
     lic = LicenseManager(lang=lang, logger=logger)
     lic.ensure_for_cli(
         use_keysys_flag=force_keysys,
@@ -2084,6 +2249,7 @@ def detect_backends() -> Dict[str, object]:
 def run_customtkinter_ui(ctk, default_lang: str = "lv", debug_default: bool = False, beta_default: bool = False) -> None:
     import tkinter.messagebox as messagebox
     import tkinter as tk
+    from tkinter import filedialog
 
     app = ctk.CTk()
     app.title(I18N[default_lang]["title"])
@@ -2150,38 +2316,416 @@ def run_customtkinter_ui(ctk, default_lang: str = "lv", debug_default: bool = Fa
     gain_entry = ctk.CTkEntry(opts, placeholder_text=L("ui_gain"))
     gain_entry.grid(row=2, column=1, padx=8, pady=4, sticky="ew")
 
+    gui_tools = ctk.CTkFrame(app)
+    gui_tools.grid(row=4, column=0, padx=12, pady=8, sticky="ew")
+    gui_tools.grid_columnconfigure(1, weight=1)
+    gui_title = ctk.CTkLabel(gui_tools, text=L("ui_gui_tools"), font=("Arial", 15, "bold"))
+    gui_title.grid(row=0, column=0, columnspan=4, padx=8, pady=(8, 4), sticky="w")
+    theme_label = ctk.CTkLabel(gui_tools, text=L("ui_theme"))
+    theme_label.grid(row=1, column=0, padx=8, pady=4, sticky="w")
+    theme_map = {
+        L("ui_theme_system"): "system",
+        L("ui_theme_light"): "light",
+        L("ui_theme_dark"): "dark",
+    }
+    current_theme = ctk.get_appearance_mode() if hasattr(ctk, "get_appearance_mode") else "System"
+    inverse_theme_map = {v.lower(): k for k, v in theme_map.items()}
+    theme_default_key = inverse_theme_map.get(str(current_theme).lower(), L("ui_theme_system"))
+    theme_var = tk.StringVar(value=theme_default_key)
+    theme_menu = ctk.CTkOptionMenu(gui_tools, values=list(theme_map.keys()), variable=theme_var)
+    theme_menu.grid(row=1, column=1, padx=8, pady=4, sticky="w")
+
+    accent_label = ctk.CTkLabel(gui_tools, text=L("ui_accent"))
+    accent_label.grid(row=1, column=2, padx=8, pady=4, sticky="w")
+    accent_options = ["blue", "dark-blue", "green", "teal", "red", "purple", "orange"]
+    accent_var = tk.StringVar(value=accent_options[0])
+    accent_menu = ctk.CTkOptionMenu(gui_tools, values=accent_options, variable=accent_var)
+    accent_menu.grid(row=1, column=3, padx=8, pady=4, sticky="w")
+
+    widget_scale_label = ctk.CTkLabel(gui_tools, text=L("ui_widget_scaling"))
+    widget_scale_label.grid(row=2, column=0, padx=8, pady=4, sticky="w")
+    ui_scale_var = tk.DoubleVar(value=1.0)
+    ui_scale_slider = ctk.CTkSlider(gui_tools, from_=0.8, to=1.4, number_of_steps=12, variable=ui_scale_var)
+    ui_scale_slider.grid(row=2, column=1, padx=8, pady=4, sticky="ew")
+
+    log_font_label = ctk.CTkLabel(gui_tools, text=L("ui_log_font"))
+    log_font_label.grid(row=2, column=2, padx=8, pady=4, sticky="w")
+    log_font_var = tk.DoubleVar(value=12.0)
+    log_font_slider = ctk.CTkSlider(gui_tools, from_=8, to=20, number_of_steps=12, variable=log_font_var)
+    log_font_slider.grid(row=2, column=3, padx=8, pady=4, sticky="ew")
+
+    log_tools = ctk.CTkFrame(app)
+    log_tools.grid(row=5, column=0, padx=12, pady=(0, 8), sticky="ew")
+    log_tools.grid_columnconfigure(6, weight=1)
+    log_tools_title = ctk.CTkLabel(log_tools, text=L("ui_log_tools"), font=("Arial", 15, "bold"))
+    log_tools_title.grid(row=0, column=0, columnspan=7, padx=8, pady=(8, 4), sticky="w")
+    log_wrap_var = tk.BooleanVar(value=True)
+    log_wrap_chk = ctk.CTkCheckBox(log_tools, text=L("ui_log_wrap"), variable=log_wrap_var)
+    log_wrap_chk.grid(row=1, column=0, padx=8, pady=4, sticky="w")
+    log_autoscroll_var = tk.BooleanVar(value=True)
+    log_autoscroll_chk = ctk.CTkCheckBox(
+        log_tools, text=L("ui_log_autoscroll"), variable=log_autoscroll_var
+    )
+    log_autoscroll_chk.grid(row=1, column=1, padx=8, pady=4, sticky="w")
+    log_pause_var = tk.BooleanVar(value=False)
+    log_pause_chk = ctk.CTkCheckBox(log_tools, text=L("ui_log_pause"), variable=log_pause_var)
+    log_pause_chk.grid(row=1, column=2, padx=8, pady=4, sticky="w")
+    log_highlight_var = tk.BooleanVar(value=True)
+    log_highlight_chk = ctk.CTkCheckBox(
+        log_tools, text=L("ui_log_highlight"), variable=log_highlight_var
+    )
+    log_highlight_chk.grid(row=1, column=3, padx=8, pady=4, sticky="w")
+    log_timestamp_var = tk.BooleanVar(value=True)
+    log_timestamp_chk = ctk.CTkCheckBox(
+        log_tools, text=L("ui_log_timestamp"), variable=log_timestamp_var
+    )
+    log_timestamp_chk.grid(row=1, column=4, padx=8, pady=4, sticky="w")
+
+    log_filter_var = tk.StringVar()
+    log_filter_entry = ctk.CTkEntry(log_tools, placeholder_text=L("ui_log_filter"), textvariable=log_filter_var)
+    log_filter_entry.grid(row=2, column=0, columnspan=2, padx=8, pady=4, sticky="ew")
+    log_clear_btn = ctk.CTkButton(log_tools, text=L("ui_log_clear"))
+    log_clear_btn.grid(row=2, column=2, padx=4, pady=4)
+    log_copy_btn = ctk.CTkButton(log_tools, text=L("ui_log_copy"))
+    log_copy_btn.grid(row=2, column=3, padx=4, pady=4)
+    log_save_btn = ctk.CTkButton(log_tools, text=L("ui_log_save"))
+    log_save_btn.grid(row=2, column=4, padx=4, pady=4)
+
     lang_frame = ctk.CTkFrame(app)
-    lang_frame.grid(row=4, column=0, padx=12, pady=4, sticky="ew")
+    lang_frame.grid(row=6, column=0, padx=12, pady=4, sticky="ew")
     ctk.CTkLabel(lang_frame, text=L("ui_lang")).grid(row=0, column=0, padx=8, pady=6, sticky="w")
     lang_menu = ctk.CTkOptionMenu(lang_frame, values=["lv", "en", "ru"], variable=lang_var)
     lang_menu.grid(row=0, column=1, padx=8, pady=6, sticky="w")
 
+    beta_tools = ctk.CTkFrame(app)
+    beta_tools.grid(row=7, column=0, padx=12, pady=8, sticky="nsew")
+    beta_tools.grid_columnconfigure(0, weight=1)
+    beta_tools.grid_rowconfigure(3, weight=1)
+    beta_title = ctk.CTkLabel(beta_tools, text=L("ui_beta_features"), font=("Arial", 15, "bold"))
+    beta_title.grid(row=0, column=0, columnspan=6, padx=8, pady=(8, 0), sticky="w")
+    beta_hint = ctk.CTkLabel(beta_tools, text=L("ui_beta_feature_hint"))
+    beta_hint.grid(row=1, column=0, columnspan=6, padx=8, pady=(0, 6), sticky="w")
+    feature_filter_var = tk.StringVar()
+    feature_filter_entry = ctk.CTkEntry(
+        beta_tools,
+        placeholder_text=L("ui_beta_feature_search"),
+        textvariable=feature_filter_var,
+    )
+    feature_filter_entry.grid(row=2, column=0, columnspan=2, padx=8, pady=4, sticky="ew")
+    beta_buttons_frame = ctk.CTkFrame(beta_tools)
+    beta_buttons_frame.grid(row=2, column=2, columnspan=4, padx=4, pady=4, sticky="e")
+    select_all_btn = ctk.CTkButton(beta_buttons_frame, text=L("ui_select_all"))
+    select_all_btn.grid(row=0, column=0, padx=4, pady=2)
+    select_none_btn = ctk.CTkButton(beta_buttons_frame, text=L("ui_select_none"))
+    select_none_btn.grid(row=0, column=1, padx=4, pady=2)
+    restore_defaults_btn = ctk.CTkButton(beta_buttons_frame, text=L("ui_restore_defaults"))
+    restore_defaults_btn.grid(row=0, column=2, padx=4, pady=2)
+    import_btn = ctk.CTkButton(beta_buttons_frame, text=L("ui_import"))
+    import_btn.grid(row=0, column=3, padx=4, pady=2)
+    export_btn = ctk.CTkButton(beta_buttons_frame, text=L("ui_export"))
+    export_btn.grid(row=0, column=4, padx=4, pady=2)
+    collapse_btn = ctk.CTkButton(beta_buttons_frame, text=L("ui_collapse"))
+    collapse_btn.grid(row=0, column=5, padx=4, pady=2)
+
+    feature_scroll = ctk.CTkScrollableFrame(beta_tools, height=220)
+    feature_scroll.grid(row=3, column=0, columnspan=6, padx=8, pady=4, sticky="nsew")
+    beta_count_label = ctk.CTkLabel(beta_tools, text="")
+    beta_count_label.grid(row=4, column=0, columnspan=6, padx=8, pady=(0, 8), sticky="w")
+
     btns = ctk.CTkFrame(app)
-    btns.grid(row=5, column=0, padx=12, pady=8, sticky="ew")
+    btns.grid(row=8, column=0, padx=12, pady=8, sticky="ew")
     start_btn = ctk.CTkButton(btns, text=L("ui_start"))
     start_btn.grid(row=0, column=0, padx=8, pady=8)
     ctk.CTkButton(btns, text=L("ui_close"), command=app.destroy).grid(row=0, column=1, padx=8, pady=8)
 
     log_box = ctk.CTkTextbox(app, height=240)
-    log_box.grid(row=6, column=0, padx=12, pady=(8, 12), sticky="nsew")
-    app.grid_rowconfigure(6, weight=1)
+    log_box.grid(row=9, column=0, padx=12, pady=(8, 12), sticky="nsew")
+    app.grid_rowconfigure(9, weight=1)
     log_box.configure(state="disabled")
-    log_queue: "queue.Queue[str]" = queue.Queue()
+    log_box.tag_configure("error", foreground="#ff5c5c")
+    log_box.tag_configure("warning", foreground="#f5a623")
+    log_queue: "queue.Queue[Tuple[datetime, str]]" = queue.Queue()
+    log_history: List[Tuple[datetime, str]] = []
+    pending_logs: List[Tuple[datetime, str]] = []
+
+    def get_filtered_lines() -> List[Tuple[datetime, str]]:
+        query = (log_filter_var.get() or "").strip().lower()
+        if not query:
+            return list(log_history)
+        return [entry for entry in log_history if query in entry[1].lower()]
+
+    def refresh_log_display() -> None:
+        lines = get_filtered_lines()
+        log_box.configure(state="normal")
+        log_box.delete("1.0", "end")
+        wrap_mode = "word" if log_wrap_var.get() else "none"
+        log_box.configure(wrap=wrap_mode)
+        log_box.configure(font=("Consolas", int(log_font_var.get())))
+        for ts, text in lines:
+            display = text
+            if log_timestamp_var.get():
+                display = f"[{ts.strftime('%H:%M:%S')}] {text}"
+            start_index = log_box.index("end-1c")
+            log_box.insert("end", display + "\n")
+            end_index = log_box.index("end-1c")
+            if log_highlight_var.get():
+                lower_text = text.lower()
+                if "❌" in text or "error" in lower_text:
+                    log_box.tag_add("error", start_index, end_index)
+                elif "⚠" in text or "warn" in lower_text:
+                    log_box.tag_add("warning", start_index, end_index)
+        log_box.configure(state="disabled")
+        if log_autoscroll_var.get():
+            log_box.see("end")
 
     def append_log(m: str):
-        log_queue.put(m)
+        log_queue.put((datetime.now(), m))
+
+    def flush_pending() -> None:
+        if not log_pause_var.get() and pending_logs:
+            log_history.extend(pending_logs)
+            pending_logs.clear()
+            refresh_log_display()
 
     def process_queue():
         try:
             while True:
-                m = log_queue.get_nowait()
-                log_box.configure(state="normal")
-                log_box.insert("end", m + "\n")
-                log_box.see("end")
-                log_box.configure(state="disabled")
+                ts, message = log_queue.get_nowait()
+                if log_pause_var.get():
+                    pending_logs.append((ts, message))
+                else:
+                    log_history.append((ts, message))
+                    refresh_log_display()
         except queue.Empty:
             pass
         app.after(100, process_queue)
+
+    def on_clear_log() -> None:
+        log_history.clear()
+        pending_logs.clear()
+        refresh_log_display()
+
+    def on_copy_log() -> None:
+        lines = get_filtered_lines()
+        rendered = [f"[{ts.strftime('%H:%M:%S')}] {text}" if log_timestamp_var.get() else text for ts, text in lines]
+        try:
+            app.clipboard_clear()
+            app.clipboard_append("\n".join(rendered))
+        except Exception:
+            pass
+
+    def on_save_log() -> None:
+        lines = get_filtered_lines()
+        rendered = [f"[{ts.strftime('%H:%M:%S')}] {text}" if log_timestamp_var.get() else text for ts, text in lines]
+        path = filedialog.asksaveasfilename(
+            defaultextension=".txt",
+            filetypes=[("Text", "*.txt"), ("JSON", "*.json"), ("All", "*.*")],
+        )
+        if not path:
+            return
+        try:
+            with open(path, "w", encoding="utf-8") as fh:
+                if path.lower().endswith(".json"):
+                    json.dump(
+                        [
+                            {
+                                "timestamp": ts.isoformat(),
+                                "message": text,
+                            }
+                            for ts, text in lines
+                        ],
+                        fh,
+                        ensure_ascii=False,
+                        indent=2,
+                    )
+                else:
+                    fh.write("\n".join(rendered))
+            messagebox.showinfo(I18N[lang_var.get()]["title"], L("ui_log_saved"))
+        except Exception as exc:
+            messagebox.showerror(I18N[lang_var.get()]["title"], str(exc))
+
+    log_clear_btn.configure(command=on_clear_log)
+    log_copy_btn.configure(command=on_copy_log)
+    log_save_btn.configure(command=on_save_log)
+
+    def apply_log_font(value: float) -> None:
+        try:
+            log_font_var.set(float(value))
+        except Exception:
+            pass
+        refresh_log_display()
+
+    log_font_slider.configure(command=apply_log_font)
+
+    def apply_ui_scale(value: float) -> None:
+        try:
+            ctk.set_widget_scaling(float(value))
+        except Exception:
+            pass
+
+    ui_scale_slider.configure(command=apply_ui_scale)
+
+    def on_accent_change(choice: str) -> None:
+        try:
+            ctk.set_default_color_theme(choice)
+        except Exception:
+            pass
+
+    accent_menu.configure(command=on_accent_change)
+
+    theme_map_ref = {
+        "map": {
+            L("ui_theme_system"): "system",
+            L("ui_theme_light"): "light",
+            L("ui_theme_dark"): "dark",
+        }
+    }
+
+    def on_theme_change(choice: str) -> None:
+        actual = theme_map_ref["map"].get(choice, "system")
+        try:
+            ctk.set_appearance_mode(actual)
+        except Exception:
+            pass
+
+    theme_menu.configure(command=on_theme_change)
+
+    def update_beta_count() -> None:
+        total = len(beta_feature_vars)
+        enabled = sum(1 for var in beta_feature_vars.values() if var.get())
+        beta_count_label.configure(text=L("ui_feature_count", a=enabled, b=total))
+
+    def refresh_beta_filter(*_ignored) -> None:
+        query = (feature_filter_var.get() or "").strip().lower()
+        for name, widget in beta_feature_widgets.items():
+            label = BETA_FEATURE_LABELS.get(name, name).lower()
+            if not query or query in label:
+                widget.grid()
+            else:
+                widget.grid_remove()
+
+    beta_feature_defaults: Dict[str, bool] = {name: True for name in BETA_FEATURE_NAMES}
+    beta_feature_vars: Dict[str, tk.BooleanVar] = {}
+    beta_feature_widgets: Dict[str, ctk.CTkCheckBox] = {}
+
+    for row_index, feature_name in enumerate(BETA_FEATURE_NAMES):
+        var = tk.BooleanVar(value=beta_feature_defaults.get(feature_name, True))
+        beta_feature_vars[feature_name] = var
+        checkbox = ctk.CTkCheckBox(
+            feature_scroll,
+            text=BETA_FEATURE_LABELS.get(feature_name, feature_name),
+            variable=var,
+        )
+        checkbox.grid(row=row_index, column=0, padx=6, pady=2, sticky="w")
+        beta_feature_widgets[feature_name] = checkbox
+
+        def _trace_factory(v: tk.BooleanVar) -> Callable[[str, str, str], None]:
+            return lambda *args: update_beta_count()
+
+        var.trace_add("write", _trace_factory(var))
+
+    update_beta_count()
+    refresh_beta_filter()
+
+    def select_all_features() -> None:
+        for var in beta_feature_vars.values():
+            var.set(True)
+        update_beta_count()
+
+    def select_none_features() -> None:
+        for var in beta_feature_vars.values():
+            var.set(False)
+        update_beta_count()
+
+    def restore_feature_defaults() -> None:
+        for name, default in beta_feature_defaults.items():
+            beta_feature_vars[name].set(default)
+        update_beta_count()
+
+    def export_beta_preset() -> None:
+        path = filedialog.asksaveasfilename(
+            defaultextension=".json",
+            filetypes=[("JSON", "*.json"), ("All", "*.*")],
+        )
+        if not path:
+            return
+        try:
+            payload = {name: var.get() for name, var in beta_feature_vars.items()}
+            with open(path, "w", encoding="utf-8") as fh:
+                json.dump(payload, fh, ensure_ascii=False, indent=2)
+            messagebox.showinfo(I18N[lang_var.get()]["title"], L("ui_beta_feature_saved"))
+        except Exception as exc:
+            messagebox.showerror(I18N[lang_var.get()]["title"], L("ui_beta_feature_error", e=str(exc)))
+
+    def import_beta_preset() -> None:
+        path = filedialog.askopenfilename(filetypes=[("JSON", "*.json"), ("All", "*.*")])
+        if not path:
+            return
+        try:
+            with open(path, "r", encoding="utf-8") as fh:
+                data = json.load(fh)
+            if isinstance(data, list):
+                data = {name: name in data for name in BETA_FEATURE_NAMES}
+            if isinstance(data, dict):
+                for name, value in data.items():
+                    if name in beta_feature_vars:
+                        beta_feature_vars[name].set(bool(value))
+                update_beta_count()
+                refresh_beta_filter()
+                messagebox.showinfo(I18N[lang_var.get()]["title"], L("ui_beta_feature_loaded"))
+            else:
+                raise ValueError("Invalid preset format")
+        except Exception as exc:
+            messagebox.showerror(I18N[lang_var.get()]["title"], L("ui_beta_feature_error", e=str(exc)))
+
+    select_all_btn.configure(command=select_all_features)
+    select_none_btn.configure(command=select_none_features)
+    restore_defaults_btn.configure(command=restore_feature_defaults)
+    import_btn.configure(command=import_beta_preset)
+    export_btn.configure(command=export_beta_preset)
+
+    collapsed_state = {"collapsed": False}
+
+    def toggle_collapse() -> None:
+        collapsed_state["collapsed"] = not collapsed_state["collapsed"]
+        if collapsed_state["collapsed"]:
+            feature_scroll.grid_remove()
+            beta_count_label.grid_remove()
+            collapse_btn.configure(text=L("ui_expand"))
+        else:
+            feature_scroll.grid()
+            beta_count_label.grid()
+            collapse_btn.configure(text=L("ui_collapse"))
+
+    collapse_btn.configure(command=toggle_collapse)
+
+    def update_beta_feature_states(*_args) -> None:
+        enabled = beta_var.get()
+        state = "normal" if enabled else "disabled"
+        entry_state = "normal" if enabled else "disabled"
+        feature_filter_entry.configure(state=entry_state)
+        for widget in beta_feature_widgets.values():
+            widget.configure(state=state)
+        for btn in (
+            select_all_btn,
+            select_none_btn,
+            restore_defaults_btn,
+            import_btn,
+            export_btn,
+            collapse_btn,
+        ):
+            btn.configure(state=state)
+
+    beta_var.trace_add("write", update_beta_feature_states)
+    update_beta_feature_states()
+
+    feature_filter_var.trace_add("write", refresh_beta_filter)
+    log_filter_var.trace_add("write", lambda *args: refresh_log_display())
+    log_wrap_var.trace_add("write", lambda *args: refresh_log_display())
+    log_highlight_var.trace_add("write", lambda *args: refresh_log_display())
+    log_timestamp_var.trace_add("write", lambda *args: refresh_log_display())
+    log_pause_var.trace_add("write", lambda *args: flush_pending())
+    refresh_log_display()
 
     lic_mgr = LicenseManager(lang=lang_var.get(), logger=append_log)
     popup_open_flag = {"open": False}
@@ -2284,6 +2828,7 @@ def run_customtkinter_ui(ctk, default_lang: str = "lv", debug_default: bool = Fa
         ks_key: Optional[str],
         force_keysys: bool,
         beta_flag: bool,
+        beta_overrides: Optional[Dict[str, bool]],
     ):
         try:
             run_automation(
@@ -2298,6 +2843,7 @@ def run_customtkinter_ui(ctk, default_lang: str = "lv", debug_default: bool = Fa
                 license_key=ks_key,
                 force_keysys=force_keysys,
                 beta_mode=beta_flag,
+                beta_overrides=beta_overrides,
             )
         except Exception as exc:
             append_log(f"❌ {exc}")
@@ -2332,6 +2878,15 @@ def run_customtkinter_ui(ctk, default_lang: str = "lv", debug_default: bool = Fa
         ks_user = lic_user_entry.get().strip() or None
         ks_key = lic_key_entry.get().strip() or None
 
+        beta_overrides: Optional[Dict[str, bool]] = None
+        if beta_var.get():
+            overrides: Dict[str, bool] = {}
+            for name, var in beta_feature_vars.items():
+                desired = var.get()
+                if desired != beta_feature_defaults.get(name, True):
+                    overrides[name] = desired
+            beta_overrides = overrides
+
         if remember_var.get():
             save_credentials(u, p)
             append_log(T(lang_var.get(), "creds_saved"))
@@ -2353,6 +2908,7 @@ def run_customtkinter_ui(ctk, default_lang: str = "lv", debug_default: bool = Fa
                 ks_key,
                 force,
                 beta_var.get(),
+                beta_overrides,
             ),
             daemon=True,
         ).start()
@@ -2367,12 +2923,53 @@ def run_customtkinter_ui(ctk, default_lang: str = "lv", debug_default: bool = Fa
         beta_chk.configure(text=L("ui_beta"))
         until_entry.configure(placeholder_text=L("ui_until"))
         gain_entry.configure(placeholder_text=L("ui_gain"))
+        gui_title.configure(text=L("ui_gui_tools"))
+        theme_label.configure(text=L("ui_theme"))
+        accent_label.configure(text=L("ui_accent"))
+        widget_scale_label.configure(text=L("ui_widget_scaling"))
+        log_font_label.configure(text=L("ui_log_font"))
+        log_tools_title.configure(text=L("ui_log_tools"))
+        log_wrap_chk.configure(text=L("ui_log_wrap"))
+        log_autoscroll_chk.configure(text=L("ui_log_autoscroll"))
+        log_pause_chk.configure(text=L("ui_log_pause"))
+        log_highlight_chk.configure(text=L("ui_log_highlight"))
+        log_timestamp_chk.configure(text=L("ui_log_timestamp"))
+        log_filter_entry.configure(placeholder_text=L("ui_log_filter"))
+        log_clear_btn.configure(text=L("ui_log_clear"))
+        log_copy_btn.configure(text=L("ui_log_copy"))
+        log_save_btn.configure(text=L("ui_log_save"))
+        beta_title.configure(text=L("ui_beta_features"))
+        beta_hint.configure(text=L("ui_beta_feature_hint"))
+        feature_filter_entry.configure(placeholder_text=L("ui_beta_feature_search"))
+        select_all_btn.configure(text=L("ui_select_all"))
+        select_none_btn.configure(text=L("ui_select_none"))
+        restore_defaults_btn.configure(text=L("ui_restore_defaults"))
+        import_btn.configure(text=L("ui_import"))
+        export_btn.configure(text=L("ui_export"))
+        collapse_btn.configure(text=L("ui_expand") if collapsed_state["collapsed"] else L("ui_collapse"))
+        refresh_beta_filter()
+        update_beta_count()
         start_btn.configure(text=L("ui_start"))
         lic_check_btn.configure(text=L("ui_check_license"))
         lic_end_btn.configure(text=L("ui_end_trial"))
         lic_status.configure(text=L("status") + ": —")
         lic_user_entry.configure(placeholder_text=L("ui_license_user_ph"))
         lic_key_entry.configure(placeholder_text=L("ui_license_key_ph"))
+
+        old_map = theme_map_ref["map"]
+        current_actual = old_map.get(theme_var.get(), "system")
+        new_map = {
+            L("ui_theme_system"): "system",
+            L("ui_theme_light"): "light",
+            L("ui_theme_dark"): "dark",
+        }
+        theme_map_ref["map"] = new_map
+        theme_menu.configure(values=list(new_map.keys()))
+        chosen_label = next(
+            (label for label, actual in new_map.items() if actual == current_actual),
+            next(iter(new_map.keys())),
+        )
+        theme_var.set(chosen_label)
 
     lang_var.trace_add(
         "write",
@@ -2451,6 +3048,7 @@ def main(argv: Optional[List[str]] = None) -> None:
             license_key=args.license,
             force_keysys=args.keysys,
             beta_mode=args.beta,
+            beta_overrides=None,
         )
         if args.save_creds:
             save_credentials(cli_user, cli_pass)
