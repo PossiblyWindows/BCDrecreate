@@ -897,6 +897,19 @@ var index_default = {
         }, { status: 200 });
       }
 
+      if (url.pathname === "/tier" && request.method === "GET") {
+        const maybeKeyOrUser = url.searchParams.get("key") || url.searchParams.get("license") || url.searchParams.get("user") || url.searchParams.get("username");
+        if (!maybeKeyOrUser) {
+          return obfJson({ success: false, message: "Missing required fields: key or user" }, { status: 400 });
+        }
+        const found = await findLicenseByKeyOrUser(maybeKeyOrUser);
+        if (!found) {
+          return obfJson({ success: false, message: "Unknown license key or username." }, { status: 404 });
+        }
+        const { username, record } = found;
+        return obfJson({ success: true, username, tier: record.tier || "Basic" }, { status: 200 });
+      }
+
       if (url.pathname === "/msg" && request.method === "POST") {
         let body = {};
         try {
@@ -904,11 +917,24 @@ var index_default = {
         } catch (e) {
           return obfJson({ success: false, message: "Invalid JSON body" }, { status: 400 });
         }
-        const maybeKeyOrUser = body.key;
-        const message = body.message;
-        if (!maybeKeyOrUser || !message) {
+        const maybeKeyOrUser = typeof body.key === "string" ? body.key.trim() : null;
+        const rawMessage = typeof body.message === "string" ? body.message.trim() : null;
+        if (!maybeKeyOrUser || !rawMessage) {
           return obfJson({ success: false, message: "Missing required fields: key, message" }, { status: 400 });
         }
+        if (rawMessage.length > 6000) {
+          return obfJson({ success: false, message: "Message too long" }, { status: 413 });
+        }
+
+        const clientIp = request.headers.get("CF-Connecting-IP") || request.headers.get("x-forwarded-for") || "unknown";
+        if (env.NONCES_KV) {
+          const rateKey = `msg-rate:${maybeKeyOrUser}:${clientIp}`;
+          const attempts = await kvIncrement(env.NONCES_KV, rateKey, 60);
+          if (attempts > 20) {
+            return obfJson({ success: false, message: "Rate limit exceeded" }, { status: 429 });
+          }
+        }
+
         const found = await findLicenseByKeyOrUser(maybeKeyOrUser);
         if (!found) {
           return obfJson({ success: false, message: "Unknown license key or username." }, { status: 404 });
@@ -922,21 +948,76 @@ var index_default = {
           return obfJson({ success: false, message: "License expired" }, { status: 403 });
         }
         const tier = lic.tier || "Basic";
-        let model = null;
-        switch (tier) {
-          case "Basic":
-            return obfJson({ success: false, message: "Basic tier cannot use /msg" }, { status: 403 });
-          case "Basic+":
-            model = "gpt-4o-mini";
-            break;
-          case "Pro":
-            model = "gpt-5-nano";
-            break;
-          case "Premium":
-            model = "gpt-5.1-nano";
-            break;
-          default:
-            return obfJson({ success: false, message: "Unknown tier" }, { status: 400 });
+        const model = tier === "Basic+" ? "gpt-4o-mini" : tier === "Pro" ? "gpt-5-nano" : tier === "Premium" ? "gpt-5.1-nano" : null;
+        const message = rawMessage;
+        let openaiError = null;
+
+        async function callFallbackChat(userMessage, reason) {
+          const payload = {
+            messages: [
+              {
+                role: "system",
+                content: "You are ChatGPT 5, an advanced AI assistant. Be helpful and concise. IMPORTANT: If a user asks for an image, picture, logo, design, or visual in ANY language, provide a detailed description or prompt for the image. Never say you cannot generate images. The platform handles image generation automatically when users request visuals.",
+              },
+              { role: "user", content: "67" },
+              {
+                role: "assistant",
+                content: "It seems like you entered \"67.\" Could you please provide more context or specify what you would like to know or discuss about it?",
+              },
+              { role: "user", content: "whats this file? What programming language?" },
+              {
+                role: "assistant",
+                content: "The file you've provided is a Python script named `ehrvote.py`. It is designed to exploit a buffer overflow vulnerability in the SHOUTcast DNAS (Distributed Network Audio Server) version 1.9.8, specifically targeting the `admin.cgi` endpoint. Here are the key details about the script:\n\n### Key Information:\n\n- **Programming Language**: Python\n- **Purpose**: The script is intended for educational purposes and testing. It demonstrates how to craft a request that potentially causes a buffer overflow by sending a long string of backslashes as a parameter (`pass`) in a GET request.\n- **Target**: The script targets a specific SHOUTcast server URL (which appears to be down as noted in the comments).\n- **Dependencies**: It requires the `requests` library, which is used to handle HTTP requests in Python.\n\n### Functionality:\n\n1. **Crafting Payload**: The script creates a payload that consists of 10,000 backslashes, which is meant to overflow the buffer in the application when processed.\n2. **Sending Request**: It sends a GET request to the `admin.cgi` endpoint with the crafted parameters.\n3. **Handling Response**: It prints out the server's HTTP status code, headers, and part of the response body. If a crash occurs, it may receive an empty response.\n4. **Error Handling**: It includes error handling for potential request issues.\n\n### Warning:\nThe script includes a clear warning that it should not be used on unauthorized systems and is intended solely for educational and testing scenarios. Always ensure ethical practices when dealing with security vulnerabilities.",
+              },
+              { role: "user", content: "Describe this photo" },
+              {
+                role: "assistant",
+                content: "The provided text appears to be a corrupted or unreadable version of a JPEG image file, indicating that it contains binary data rather than human-readable content. However, I can help you visualize a photo based on a general description of a typical premium photo.\n\n### Description of a Premium Photo:\nImagine a vibrant landscape featuring a stunning sunset over a serene lake. The sky is painted with hues of orange, pink, and purple, reflecting beautifully on the calm water surface. In the foreground, lush green trees frame the scene, and a silhouette of distant mountains adds depth to the horizon. The overall atmosphere is tranquil, evoking feelings of peace and natural beauty.\n\nIf you have a specific image in mind or need a different type of description, please let me know!",
+              },
+              { role: "user", content: "Hi" },
+              { role: "assistant", content: "Hello! How can I assist you today?" },
+              { role: "user", content: `Task and prompt to solve:\n${userMessage}` },
+            ],
+            provider: "openai",
+          };
+
+          let parsed = null;
+          let rawText = null;
+          try {
+            const r = await fetch("https://chatgpt5free.com/wp-json/chatgpt-pro/v1/chat", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payload),
+            });
+            rawText = await r.text();
+            try {
+              parsed = JSON.parse(rawText);
+            } catch (e) {
+              parsed = { raw: rawText };
+            }
+            if (!r.ok) {
+              return {
+                error: {
+                  status: r.status,
+                  statusText: r.statusText,
+                  body: parsed,
+                  raw: rawText,
+                },
+                reason,
+              };
+            }
+          } catch (e) {
+            return { error: { message: "Fallback request failed", error: String(e) }, reason };
+          }
+
+          const fallbackReply = parsed?.choices?.[0]?.message?.content ?? parsed?.reply ?? parsed?.message ?? rawText;
+          return {
+            provider: "chatgpt5free",
+            model: "chatgpt5free",
+            reply: fallbackReply || "(no text)",
+            raw: parsed ?? rawText,
+            reason,
+          };
         }
 
         // READ OPENAI KEY: prefer env variable, fallback to CONFIG_KV (persisted via GUI)
@@ -949,50 +1030,76 @@ var index_default = {
         } catch (e) {
         }
 
-        if (!OPENAI_API_KEY) {
-          return obfJson({ success: false, message: "Server missing OpenAI API key" }, { status: 500 });
-        }
-        let responseAI;
-        try {
-          const r = await fetch("https://api.openai.com/v1/chat/completions", {
-            method: "POST",
-            headers: {
-              "Authorization": `Bearer ${OPENAI_API_KEY}`,
-              "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-              model,
-              messages: [
-                { role: "user", content: message }
-              ],
-              max_tokens: 800
-            })
-          });
-          const text = await r.text();
+        let result = null;
+        if (!model) {
+          openaiError = { message: "Tier does not allow OpenAI chat" };
+        } else if (!OPENAI_API_KEY) {
+          openaiError = { message: "Server missing OpenAI API key" };
+        } else {
           try {
-            responseAI = JSON.parse(text);
-          } catch {
-            responseAI = { raw: text };
+            const r = await fetch("https://api.openai.com/v1/chat/completions", {
+              method: "POST",
+              headers: {
+                "Authorization": `Bearer ${OPENAI_API_KEY}`,
+                "Content-Type": "application/json"
+              },
+              body: JSON.stringify({
+                model,
+                messages: [
+                  { role: "user", content: message }
+                ],
+                max_tokens: 800
+              })
+            });
+            const text = await r.text();
+            let responseAI;
+            try {
+              responseAI = JSON.parse(text);
+            } catch {
+              responseAI = { raw: text };
+            }
+            if (!r.ok) {
+              openaiError = {
+                message: "OpenAI returned an error",
+                status: r.status,
+                statusText: r.statusText,
+                headers: Object.fromEntries(r.headers.entries()),
+                body: responseAI,
+                raw: text
+              };
+            } else {
+              const reply = responseAI?.choices?.[0]?.message?.content ?? responseAI?.choices?.[0]?.text ?? responseAI?.output ?? null;
+              result = {
+                provider: "openai",
+                model,
+                reply: reply ?? "(no text)",
+                raw: responseAI,
+                reason: null,
+              };
+            }
+          } catch (e) {
+            openaiError = { message: "Failed to reach OpenAI", error: String(e) };
           }
-          if (!r.ok) {
-            return obfJson({
-              success: false,
-              message: "OpenAI returned an error",
-              status: r.status,
-              body: responseAI
-            }, { status: 502 });
-          }
-        } catch (e) {
-          return obfJson({ success: false, message: "Failed to reach OpenAI", error: String(e) }, { status: 502 });
         }
-        const reply = responseAI?.choices?.[0]?.message?.content ?? responseAI?.choices?.[0]?.text ?? responseAI?.output ?? null;
+
+        if (!result) {
+          const fallback = await callFallbackChat(message, openaiError ? "openai_unavailable" : "tier_not_allowed");
+          if (fallback.error) {
+            return obfJson({ success: false, message: "Fallback provider failed", openai_error: openaiError, fallback_error: fallback.error }, { status: 502 });
+          }
+          result = fallback;
+        }
+
         return obfJson({
           success: true,
           username,
           tier,
-          model_used: model,
-          reply: reply ?? "(no text)",
-          raw: responseAI
+          provider: result.provider,
+          model_used: result.model,
+          reply: result.reply,
+          raw: result.raw,
+          openai_error: openaiError,
+          fallback_reason: result.reason,
         }, { status: 200 });
       }
 
