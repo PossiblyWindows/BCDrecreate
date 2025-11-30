@@ -917,11 +917,24 @@ var index_default = {
         } catch (e) {
           return obfJson({ success: false, message: "Invalid JSON body" }, { status: 400 });
         }
-        const maybeKeyOrUser = body.key;
-        const message = body.message;
-        if (!maybeKeyOrUser || !message) {
+        const maybeKeyOrUser = typeof body.key === "string" ? body.key.trim() : null;
+        const rawMessage = typeof body.message === "string" ? body.message.trim() : null;
+        if (!maybeKeyOrUser || !rawMessage) {
           return obfJson({ success: false, message: "Missing required fields: key, message" }, { status: 400 });
         }
+        if (rawMessage.length > 6000) {
+          return obfJson({ success: false, message: "Message too long" }, { status: 413 });
+        }
+
+        const clientIp = request.headers.get("CF-Connecting-IP") || request.headers.get("x-forwarded-for") || "unknown";
+        if (env.NONCES_KV) {
+          const rateKey = `msg-rate:${maybeKeyOrUser}:${clientIp}`;
+          const attempts = await kvIncrement(env.NONCES_KV, rateKey, 60);
+          if (attempts > 20) {
+            return obfJson({ success: false, message: "Rate limit exceeded" }, { status: 429 });
+          }
+        }
+
         const found = await findLicenseByKeyOrUser(maybeKeyOrUser);
         if (!found) {
           return obfJson({ success: false, message: "Unknown license key or username." }, { status: 404 });
@@ -936,6 +949,7 @@ var index_default = {
         }
         const tier = lic.tier || "Basic";
         const model = tier === "Basic+" ? "gpt-4o-mini" : tier === "Pro" ? "gpt-5-nano" : tier === "Premium" ? "gpt-5.1-nano" : null;
+        const message = rawMessage;
         let openaiError = null;
 
         async function callFallbackChat(userMessage, reason) {

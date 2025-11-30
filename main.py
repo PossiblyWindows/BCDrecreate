@@ -53,6 +53,10 @@ DEFAULT_OPENAI_KEY = os.getenv(
     "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",
 )
 
+# filesystem defaults
+SECURE_DIR_MODE = 0o700
+SECURE_FILE_MODE = 0o600
+
 # ----------------------- Platform helpers -----------------------
 
 
@@ -423,8 +427,27 @@ def T(lang: str, key: str, **kwargs) -> str:
 # ----------------------- Credential helpers ------------
 
 
+def _harden_path(path: Path, is_file: bool = False) -> None:
+    """Best-effort attempt to restrict permissions for secrets."""
+
+    try:
+        if is_file:
+            os.chmod(path, SECURE_FILE_MODE)
+        else:
+            os.chmod(path, SECURE_DIR_MODE)
+    except Exception:
+        # Non-fatal: we avoid crashing UI if OS blocks chmod (e.g. Windows)
+        pass
+
+
+def _ensure_config_dir() -> None:
+    CONFIG_DIR.mkdir(parents=True, exist_ok=True, mode=SECURE_DIR_MODE)
+    _harden_path(CONFIG_DIR)
+
+
 def load_saved_credentials() -> Tuple[Optional[str], Optional[str]]:
     try:
+        _ensure_config_dir()
         if not CREDS_FILE.exists():
             return None, None
         with CREDS_FILE.open("r", encoding="utf-8") as fh:
@@ -434,6 +457,7 @@ def load_saved_credentials() -> Tuple[Optional[str], Optional[str]]:
         if not user or not pw_blob:
             return None, None
         password = base64.b64decode(pw_blob.encode("utf-8")).decode("utf-8")
+        _harden_path(CREDS_FILE, is_file=True)
         return user, password
     except Exception:
         return None, None
@@ -443,10 +467,11 @@ def save_credentials(user: str, password: str) -> None:
     if not user or not password:
         return
     try:
-        CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+        _ensure_config_dir()
         blob = base64.b64encode(password.encode("utf-8")).decode("utf-8")
         with CREDS_FILE.open("w", encoding="utf-8") as fh:
             json.dump({"user": user, "password": blob}, fh)
+        _harden_path(CREDS_FILE, is_file=True)
     except Exception:
         pass
 
@@ -461,9 +486,10 @@ def clear_saved_credentials() -> None:
 
 def save_target_preferences(until_top: Optional[int], gain_points: Optional[float]) -> None:
     try:
-        CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+        _ensure_config_dir()
         with TARGET_FILE.open("w", encoding="utf-8") as fh:
             json.dump({"until_top": until_top, "gain_points": gain_points}, fh)
+        _harden_path(TARGET_FILE, is_file=True)
     except Exception:
         pass
 
