@@ -209,6 +209,8 @@ I18N = {
         "ui_trial_left": "Atlicis izmēģinājuma laiks: {h}:{m:02d}:{s:02d}",
         "ui_trial_expired": "Izmēģinājums beidzies — nepieciešama licence.",
         "ui_licensed": "Licencēts: {u}",
+        "ui_tier": "Aktīvais līmenis: {t}",
+        "ui_tier_trial": "Izmēģinājums",
         "ui_popup_title": "Licence",
         "ui_popup_msg": "Ievadi lietotājvārdu un licences atslēgu:",
         "ui_popup_btn_ok": "Apstiprināt",
@@ -290,6 +292,8 @@ I18N = {
         "ui_trial_left": "Trial time left: {h}:{m:02d}:{s:02d}",
         "ui_trial_expired": "Trial expired — license required.",
         "ui_licensed": "Licensed: {u}",
+        "ui_tier": "Active tier: {t}",
+        "ui_tier_trial": "Trial",
         "ui_popup_title": "License",
         "ui_popup_msg": "Enter username and license key:",
         "ui_popup_btn_ok": "Confirm",
@@ -369,6 +373,8 @@ I18N = {
         "ui_trial_left": "Осталось времени пробного периода: {h}:{m:02d}:{s:02d}",
         "ui_trial_expired": "Пробный период истёк — требуется лицензия.",
         "ui_licensed": "Лицензировано: {u}",
+        "ui_tier": "Активный тариф: {t}",
+        "ui_tier_trial": "Пробный период",
         "ui_popup_title": "Лицензия",
         "ui_popup_msg": "Введите имя пользователя и ключ лицензии:",
         "ui_popup_btn_ok": "Подтвердить",
@@ -839,6 +845,7 @@ class LicenseManager:
     def __init__(self, lang: str, logger: Logger = None):
         self.lang = lang
         self.logger = logger
+        self._tier_cache: Dict[str, Optional[str]] = {"user": None, "key": None, "value": None, "ts": 0.0}
 
     def _trial_seconds_left(self) -> int:
         if not is_windows():
@@ -874,6 +881,39 @@ class LicenseManager:
             reg_read("LicenseKey") or "",
             reg_read("LicenseHWID") or "",
         )
+
+    def _get_tier(self, ks_user: str, ks_key: str) -> Optional[str]:
+        if not ks_user and not ks_key:
+            return None
+        now = time.time()
+        if (
+            self._tier_cache["value"]
+            and self._tier_cache["user"] == ks_user
+            and self._tier_cache["key"] == ks_key
+            and now - (self._tier_cache["ts"] or 0) < 300
+        ):
+            return self._tier_cache["value"]
+
+        tier = None
+        try:
+            r = requests.get(
+                KEYSYS_BASE + "/tier",
+                params={"user": ks_user, "key": ks_key},
+                timeout=6,
+            )
+            js = r.json()
+            if js.get("success"):
+                tier = js.get("tier")
+        except Exception:
+            tier = None
+
+        self._tier_cache = {
+            "user": ks_user,
+            "key": ks_key,
+            "value": tier,
+            "ts": time.time(),
+        }
+        return tier
 
     def validate_and_store(self, ks_user: str, ks_key: str) -> Tuple[bool, str]:
         """Validate via Keysys POST /validate (bind HWID on first success). Requires user+key."""
@@ -938,7 +978,13 @@ class LicenseManager:
                 if js.get("valid"):
                     if js.get("hwid"):
                         reg_write("LicenseHWID", js["hwid"])
-                    return {"state": "licensed", "user": js.get("user") or ks_user, "left_seconds": None}
+                    tier = self._get_tier(js.get("user") or ks_user, ks_key) or "Basic"
+                    return {
+                        "state": "licensed",
+                        "user": js.get("user") or ks_user,
+                        "left_seconds": None,
+                        "tier": tier,
+                    }
                 if js.get("revoked"):
                     reg_delete("LicenseUser")
                     reg_delete("LicenseKey")
@@ -1832,6 +1878,9 @@ def run_customtkinter_ui(ctk, default_lang: str = "lv", debug_default: bool = Fa
     log_box.configure(state="disabled")
     log_queue: "queue.Queue[str]" = queue.Queue()
 
+    tier_label = ctk.CTkLabel(app, text=L("ui_tier", t="—"))
+    tier_label.grid(row=7, column=0, padx=12, pady=(0, 12), sticky="w")
+
     def append_log(m: str):
         log_queue.put(m)
 
@@ -1876,6 +1925,9 @@ def run_customtkinter_ui(ctk, default_lang: str = "lv", debug_default: bool = Fa
             if not popup_open_flag["open"]:
                 popup_open_flag["open"] = True
                 open_license_popup()
+
+        tier_text = st.get("tier") or (L("ui_tier_trial") if st["state"] == "trial" else "—")
+        tier_label.configure(text=L("ui_tier", t=tier_text))
 
         app.after(1000, update_license_status)
 
