@@ -1116,17 +1116,13 @@ var index_default = {
           return obfJson({ success: false, message: "Missing audio_url" }, { status: 400 });
         }
 
-        let OPENAI_API_KEY = env.OPENAI_API_KEY || null;
+        let hfToken = env.HF_API_TOKEN || null;
         try {
-          if (!OPENAI_API_KEY && env.CONFIG_KV) {
-            const maybe = await env.CONFIG_KV.get('OPENAI_API_KEY');
-            if (maybe) OPENAI_API_KEY = maybe;
+          if (!hfToken && env.CONFIG_KV) {
+            const maybe = await env.CONFIG_KV.get('HF_API_TOKEN');
+            if (maybe) hfToken = maybe;
           }
         } catch (e) {
-        }
-
-        if (!OPENAI_API_KEY) {
-          return obfJson({ success: false, message: "Server missing OpenAI API key" }, { status: 500 });
         }
 
         let audioResp;
@@ -1142,25 +1138,25 @@ var index_default = {
         const audioBuffer = await audioResp.arrayBuffer();
         const contentType = audioResp.headers.get("content-type") || "application/octet-stream";
 
-        const fd = new FormData();
-        fd.append("file", new Blob([audioBuffer], { type: contentType }), "task-audio");
-        fd.append("model", "whisper-1");
-        fd.append("response_format", "text");
-        if (body.language) fd.append("language", String(body.language));
+        const apiUrl = env.HF_API_URL || "https://api-inference.huggingface.co/models/openai/whisper-tiny";
+        const headers = { "Content-Type": contentType };
+        if (hfToken) headers["Authorization"] = `Bearer ${hfToken}`;
 
         try {
-          const r = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+          const r = await fetch(apiUrl, {
             method: "POST",
-            headers: {
-              "Authorization": `Bearer ${OPENAI_API_KEY}`
-            },
-            body: fd
+            headers,
+            body: audioBuffer
           });
-          const raw = await r.text();
+          const raw = await r.json();
           if (!r.ok) {
             return obfJson({ success: false, message: "Transcription failed", status: r.status, raw }, { status: r.status || 502 });
           }
-          return obfJson({ success: true, text: raw.trim() }, { status: 200 });
+          const text = typeof raw.text === "string" ? raw.text.trim() : "";
+          if (!text) {
+            return obfJson({ success: false, message: "Transcription empty", raw }, { status: 502 });
+          }
+          return obfJson({ success: true, text }, { status: 200 });
         } catch (e) {
           return obfJson({ success: false, message: "Transcription error", error: String(e) }, { status: 502 });
         }
