@@ -1103,6 +1103,65 @@ var index_default = {
         }, { status: 200 });
       }
 
+      if (url.pathname === "/transcribe" && request.method === "POST") {
+        let body = {};
+        try {
+          body = await request.json();
+        } catch (e) {
+          return obfJson({ success: false, message: "Invalid JSON body" }, { status: 400 });
+        }
+
+        const audioUrl = typeof body.audio_url === "string" ? body.audio_url.trim() : null;
+        if (!audioUrl) {
+          return obfJson({ success: false, message: "Missing audio_url" }, { status: 400 });
+        }
+
+        let hfToken = env.HF_API_TOKEN || null;
+        try {
+          if (!hfToken && env.CONFIG_KV) {
+            const maybe = await env.CONFIG_KV.get('HF_API_TOKEN');
+            if (maybe) hfToken = maybe;
+          }
+        } catch (e) {
+        }
+
+        let audioResp;
+        try {
+          audioResp = await fetch(audioUrl);
+        } catch (e) {
+          return obfJson({ success: false, message: "Failed to download audio" }, { status: 502 });
+        }
+        if (!audioResp || !audioResp.ok) {
+          return obfJson({ success: false, message: `Audio download failed (${audioResp?.status || 'unknown'})` }, { status: 502 });
+        }
+
+        const audioBuffer = await audioResp.arrayBuffer();
+        const contentType = audioResp.headers.get("content-type") || "application/octet-stream";
+
+        const apiUrl = env.HF_API_URL || "https://api-inference.huggingface.co/models/openai/whisper-tiny";
+        const headers = { "Content-Type": contentType };
+        if (hfToken) headers["Authorization"] = `Bearer ${hfToken}`;
+
+        try {
+          const r = await fetch(apiUrl, {
+            method: "POST",
+            headers,
+            body: audioBuffer
+          });
+          const raw = await r.json();
+          if (!r.ok) {
+            return obfJson({ success: false, message: "Transcription failed", status: r.status, raw }, { status: r.status || 502 });
+          }
+          const text = typeof raw.text === "string" ? raw.text.trim() : "";
+          if (!text) {
+            return obfJson({ success: false, message: "Transcription empty", raw }, { status: 502 });
+          }
+          return obfJson({ success: true, text }, { status: 200 });
+        } catch (e) {
+          return obfJson({ success: false, message: "Transcription error", error: String(e) }, { status: 502 });
+        }
+      }
+
       if (request.method === "GET" && url.pathname === "/validate") {
         const user = url.searchParams.get("user") || url.searchParams.get("username");
         const key = url.searchParams.get("key");
