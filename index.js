@@ -1103,6 +1103,69 @@ var index_default = {
         }, { status: 200 });
       }
 
+      if (url.pathname === "/transcribe" && request.method === "POST") {
+        let body = {};
+        try {
+          body = await request.json();
+        } catch (e) {
+          return obfJson({ success: false, message: "Invalid JSON body" }, { status: 400 });
+        }
+
+        const audioUrl = typeof body.audio_url === "string" ? body.audio_url.trim() : null;
+        if (!audioUrl) {
+          return obfJson({ success: false, message: "Missing audio_url" }, { status: 400 });
+        }
+
+        let OPENAI_API_KEY = env.OPENAI_API_KEY || null;
+        try {
+          if (!OPENAI_API_KEY && env.CONFIG_KV) {
+            const maybe = await env.CONFIG_KV.get('OPENAI_API_KEY');
+            if (maybe) OPENAI_API_KEY = maybe;
+          }
+        } catch (e) {
+        }
+
+        if (!OPENAI_API_KEY) {
+          return obfJson({ success: false, message: "Server missing OpenAI API key" }, { status: 500 });
+        }
+
+        let audioResp;
+        try {
+          audioResp = await fetch(audioUrl);
+        } catch (e) {
+          return obfJson({ success: false, message: "Failed to download audio" }, { status: 502 });
+        }
+        if (!audioResp || !audioResp.ok) {
+          return obfJson({ success: false, message: `Audio download failed (${audioResp?.status || 'unknown'})` }, { status: 502 });
+        }
+
+        const audioBuffer = await audioResp.arrayBuffer();
+        const contentType = audioResp.headers.get("content-type") || "application/octet-stream";
+
+        const fd = new FormData();
+        fd.append("file", new Blob([audioBuffer], { type: contentType }), "task-audio");
+        fd.append("model", "whisper-1");
+        fd.append("response_format", "text");
+        if (body.language) fd.append("language", String(body.language));
+
+        try {
+          const r = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${OPENAI_API_KEY}`
+            },
+            body: fd
+          });
+          const raw = await r.text();
+          if (!r.ok) {
+            return obfJson({ success: false, message: "Transcription failed", status: r.status, raw }, { status: r.status || 502 });
+          }
+          return obfJson({ success: true, text: raw.trim() }, { status: 200 });
+        } catch (e) {
+          return obfJson({ success: false, message: "Transcription error", error: String(e) }, { status: 502 });
+        }
+      }
+
       if (request.method === "GET" && url.pathname === "/validate") {
         const user = url.searchParams.get("user") || url.searchParams.get("username");
         const key = url.searchParams.get("key");
