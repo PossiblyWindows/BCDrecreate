@@ -1307,10 +1307,6 @@ def fetch_task(driver, lang: str, logger: Logger = None) -> Optional[TaskData]:
         if src:
             audio_url = src
             break
-    if drag_options:
-        option_texts = [o.text for o in drag_options if o.text]
-        if option_texts:
-            text_content = f"{text_content}\nAtbilžu varianti: " + ", ".join(option_texts)
     if audio_url:
         full_audio_url = urljoin(driver.current_url, audio_url)
         log_message("🎵 Audio task detected – transcribing…", logger)
