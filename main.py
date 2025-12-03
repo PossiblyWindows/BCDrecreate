@@ -28,6 +28,7 @@ from selenium.common.exceptions import (
     TimeoutException,
     WebDriverException,
 )
+from selenium.webdriver import ActionChains
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import Select, WebDriverWait
@@ -519,12 +520,27 @@ class TaskOption:
 
 
 @dataclass
+class DragOption:
+    text: str
+    element: object
+
+
+@dataclass
+class DragTarget:
+    index: int
+    element: object
+    input_element: Optional[object]
+
+
+@dataclass
 class TaskData:
     text: str
     options: List[TaskOption]
     points_label: str
     dropdown_texts: List[List[str]]
     dropdown_ids: List[Optional[str]]
+    drag_targets: List[DragTarget]
+    drag_options: List[DragOption]
 
 
 Logger = Optional[Callable[[str], None]]
@@ -725,8 +741,8 @@ def read_top_points(driver) -> Optional[int]:
 
 HIDE_MEDIA_CSS = """
 * { image-rendering: auto !important; }
-img, .gxs-resource-image, .gxst-resource-image, .gxs-dnd-option,
-[style*="background-image"], .answer-box, .ui-draggable, .taskhtmlwrapper .image, .taskhtmlwrapper figure {
+img, .gxs-resource-image, .gxst-resource-image,
+[style*="background-image"], .taskhtmlwrapper .image, .taskhtmlwrapper figure {
   display: none !important;
 }
 """
@@ -1253,11 +1269,34 @@ def fetch_task(driver, lang: str, logger: Logger = None) -> Optional[TaskData]:
     pts_el = driver.find_elements(By.CSS_SELECTOR, ".obj-points")
     if pts_el:
         points_label = pts_el[0].text.strip()
+    drag_fields = wrapper.find_elements(By.CSS_SELECTOR, ".gxs-dnd-field")
+    drag_options_raw = wrapper.find_elements(By.CSS_SELECTOR, ".gxs-dnd-option")
+    drag_targets: List[DragTarget] = []
+    drag_options: List[DragOption] = []
+
+    for idx, field in enumerate(drag_fields, start=1):
+        hidden = None
+        try:
+            hid_id = field.get_attribute("id") or ""
+            if hid_id:
+                hidden = wrapper.find_element(By.CSS_SELECTOR, f"input[id='dnd{hid_id}']")
+        except Exception:
+            hidden = None
+        drag_targets.append(DragTarget(index=idx, element=field, input_element=hidden))
+
+    for opt in drag_options_raw:
+        txt = (opt.text or "").strip()
+        if not txt:
+            txt = (opt.get_attribute("innerText") or "").strip()
+        drag_options.append(DragOption(text=txt, element=opt))
+
+    has_drag = bool(drag_targets and drag_options)
+
     media = wrapper.find_elements(
         By.CSS_SELECTOR,
-        "img,[style*='background-image'],.gxs-resource-image,.gxst-resource-image,.gxs-dnd-option,.answer-box,.ui-draggable",
+        "img,[style*='background-image'],.gxs-resource-image,.gxst-resource-image",
     )
-    if media:
+    if media and not has_drag:
         log_message(T(lang, "img_task_skip"), logger)
         return "SKIP"
 
@@ -1317,6 +1356,8 @@ def fetch_task(driver, lang: str, logger: Logger = None) -> Optional[TaskData]:
         points_label=points_label,
         dropdown_texts=dropdown_texts,
         dropdown_ids=dropdown_ids,
+        drag_targets=drag_targets,
+        drag_options=drag_options,
     )
 
 
@@ -1478,6 +1519,27 @@ def parse_answer(answer: str, task: TaskData):
     lines = [line.strip() for line in answer.splitlines() if line.strip()]
     if not lines:
         return {"mode": "empty", "values": []}
+
+    if task.drag_targets and task.drag_options:
+        option_texts = [o.text.lower() for o in task.drag_options]
+        values: List[int] = []
+        for i in range(len(task.drag_targets)):
+            line = lines[i] if i < len(lines) else (lines[-1] if lines else "")
+            chosen_idx = None
+            if line:
+                mnum = re.findall(r"\d+", line)
+                if mnum:
+                    k = int(mnum[0])
+                    if 1 <= k <= len(option_texts):
+                        chosen_idx = k
+                if chosen_idx is None:
+                    normalized = line.lower()
+                    for j, txt in enumerate(option_texts, start=1):
+                        if normalized == txt or (normalized and normalized in txt):
+                            chosen_idx = j
+                            break
+            values.append(chosen_idx or 1)
+        return {"mode": "drag", "values": values}
 
     if task.dropdown_texts:
         values: List[int] = []
@@ -1673,6 +1735,46 @@ def fill_dropdowns(
         log_message(T(lang, "no_btn"), logger)
 
 
+def fill_drag_targets(driver, task: TaskData, values: List[int], lang, logger: Logger = None):
+    if not task.drag_targets or not task.drag_options:
+        log_message(T(lang, "no_inputs"), logger)
+        return
+
+    for i, target in enumerate(task.drag_targets):
+        if i >= len(values):
+            break
+        choice_idx = values[i]
+        if not (1 <= choice_idx <= len(task.drag_options)):
+            continue
+        option = task.drag_options[choice_idx - 1]
+        try:
+            ActionChains(driver).move_to_element(option.element).click_and_hold().pause(0.1).move_to_element(target.element).pause(0.1).release().perform()
+        except Exception:
+            try:
+                js_click(driver, target.element)
+                js_click(driver, option.element)
+            except Exception:
+                continue
+
+        try:
+            data_id = option.element.get_attribute("data-id") or option.text
+            if target.input_element and data_id:
+                driver.execute_script(
+                    "arguments[0].value = arguments[1]; arguments[0].dispatchEvent(new Event('change', {bubbles:true}));",
+                    target.input_element,
+                    data_id,
+                )
+        except Exception:
+            pass
+
+    submit_button = w(driver, "#submitAnswerBtn", 6, "clickable")
+    if submit_button is not None:
+        js_click(driver, submit_button)
+        log_message(T(lang, "submitted"), logger)
+    else:
+        log_message(T(lang, "no_btn"), logger)
+
+
 # ----------------------- Orchestrator -------------------
 
 def solve_one_task(main_driver, gpt: ChatGPTSession, lang: str, logger: Logger = None) -> float:
@@ -1726,6 +1828,8 @@ def solve_one_task(main_driver, gpt: ChatGPTSession, lang: str, logger: Logger =
 
     if parsed["mode"] == "dropdowns" and task.dropdown_texts:
         fill_dropdowns(main_driver, task.dropdown_texts, task.dropdown_ids, parsed["values"], lang, logger)
+    elif parsed["mode"] == "drag" and task.drag_targets and task.drag_options:
+        fill_drag_targets(main_driver, task, parsed["values"], lang, logger)
     elif parsed["mode"] == "select" and task.options:
         select_answers(main_driver, task, parsed["values"], lang, logger)
     elif parsed["mode"] == "text" and parsed["values"]:
