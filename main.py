@@ -18,6 +18,7 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Tuple
+from urllib.parse import urljoin
 
 import requests
 from openai import AsyncOpenAI
@@ -1215,6 +1216,29 @@ def select_task(driver, lang: str, logger: Logger = None) -> bool:
     return False
 
 
+def transcribe_audio_via_worker(audio_url: str, lang: str, logger: Logger = None) -> Optional[str]:
+    payload = {"audio_url": audio_url, "language": lang}
+    try:
+        response = requests.post(f"{KEYSYS_BASE}/transcribe", json=payload, timeout=25)
+    except Exception as exc:  # pragma: no cover - network
+        log_message(f"⚠️ Audio transcription request failed: {exc}", logger)
+        return None
+
+    try:
+        data = response.json()
+    except Exception:
+        log_message(
+            f"⚠️ Audio transcription failed with status {response.status_code}", logger
+        )
+        return None
+
+    if response.ok and data.get("success") and data.get("text"):
+        return str(data.get("text"))
+
+    log_message(f"⚠️ Audio transcription failed: {data.get('message')}", logger)
+    return None
+
+
 def fetch_task(driver, lang: str, logger: Logger = None) -> Optional[TaskData]:
     wrapper = w(driver, "#taskhtml > div", 10, "visible")
     if wrapper is None:
@@ -1236,6 +1260,23 @@ def fetch_task(driver, lang: str, logger: Logger = None) -> Optional[TaskData]:
     if media:
         log_message(T(lang, "img_task_skip"), logger)
         return "SKIP"
+
+    audio_sources = wrapper.find_elements(By.CSS_SELECTOR, "audio, audio source")
+    audio_url = None
+    for aud in audio_sources:
+        src = (aud.get_attribute("src") or "").strip()
+        if src:
+            audio_url = src
+            break
+    if audio_url:
+        full_audio_url = urljoin(driver.current_url, audio_url)
+        log_message("🎵 Audio task detected – transcribing…", logger)
+        transcription = transcribe_audio_via_worker(full_audio_url, lang, logger)
+        if transcription:
+            log_message(f"🎵 Audio text: {transcription}", logger)
+            text_content = f"{text_content}\n\nAudio transcription: {transcription}"
+        else:
+            log_message("⚠️ Audio transcription failed", logger)
     options: List[TaskOption] = []
     for idx, item in enumerate(
         wrapper.find_elements(By.CSS_SELECTOR, "ul.gxs-answer-select > li"), start=1
