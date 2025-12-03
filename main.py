@@ -4,6 +4,7 @@ import argparse
 import asyncio
 import base64
 import hashlib
+import hmac
 import json
 import os
 import platform
@@ -18,6 +19,7 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Tuple
+from urllib.parse import urljoin
 
 import requests
 from openai import AsyncOpenAI
@@ -27,6 +29,7 @@ from selenium.common.exceptions import (
     TimeoutException,
     WebDriverException,
 )
+from selenium.webdriver import ActionChains
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import Select, WebDriverWait
@@ -41,17 +44,12 @@ except ImportError as exc:  # pragma: no cover - imported at runtime
 KEYSYS_BASE = "https://keysys.djcookfan61.workers.dev"
 KEYSYS_VALIDATE = KEYSYS_BASE + "/validate"
 
-REG_PATH = r"Software\\Keysys\\UzdevumiBot"
-TRIAL_MINUTES = 120
-
 CONFIG_DIR = Path.home() / ".uzdevumi_bot"
 CREDS_FILE = CONFIG_DIR / "credentials.json"
 TARGET_FILE = CONFIG_DIR / "target_points.json"
+LICENSE_FILE = CONFIG_DIR / "license.json"
 
-DEFAULT_OPENAI_KEY = os.getenv(
-    "UZDEVUMI_OPENAI_KEY",
-    "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",
-)
+DEFAULT_OPENAI_KEY = os.getenv("UZDEVUMI_OPENAI_KEY")
 
 # filesystem defaults
 SECURE_DIR_MODE = 0o700
@@ -232,7 +230,7 @@ I18N = {
         "p_radio_hdr": "Varianti (radio/checkbox):",
         "p_drop_hdr": "Varianti (dropdown):",
         # License logs
-        "lic_start_trial": "Sākta izmēģinājuma versija (120 min).",
+        "lic_start_trial": "Sākta izmēģinājuma versija.",
         "lic_trial_left": "Atlikušas izmēģinājuma minūtes: {m}",
         "lic_trial_expired": "Izmēģinājuma laiks beidzies. Nepieciešama licence.",
         "lic_valid": "Licence derīga. Lietotājs: {u}",
@@ -313,7 +311,7 @@ I18N = {
         "p8": "Task text:",
         "p_radio_hdr": "Options (radio/checkbox):",
         "p_drop_hdr": "Options (dropdown):",
-        "lic_start_trial": "Trial started (120 min).",
+        "lic_start_trial": "Trial started.",
         "lic_trial_left": "Trial minutes left: {m}",
         "lic_trial_expired": "Trial expired. License required.",
         "lic_valid": "License valid. User: {u}",
@@ -394,7 +392,7 @@ I18N = {
         "p8": "Текст задания:",
         "p_radio_hdr": "Варианты (radio/checkbox):",
         "p_drop_hdr": "Варианты (dropdown):",
-        "lic_start_trial": "Пробный период запущен (120 мин).",
+        "lic_start_trial": "Пробный период запущен.",
         "lic_trial_left": "Осталось минут пробного периода: {m}",
         "lic_trial_expired": "Пробный период истёк. Нужна лицензия.",
         "lic_valid": "Лицензия валидна. Пользователь: {u}",
@@ -484,6 +482,36 @@ def clear_saved_credentials() -> None:
         pass
 
 
+def load_license_record() -> Tuple[str, str, Optional[str]]:
+    try:
+        _ensure_config_dir()
+        if not LICENSE_FILE.exists():
+            return "", "", None
+        with LICENSE_FILE.open("r", encoding="utf-8") as fh:
+            data = json.load(fh)
+        return data.get("user", ""), data.get("key", ""), data.get("hwid")
+    except Exception:
+        return "", "", None
+
+
+def save_license_record(user: str, key: str, hwid: Optional[str]) -> None:
+    try:
+        _ensure_config_dir()
+        with LICENSE_FILE.open("w", encoding="utf-8") as fh:
+            json.dump({"user": user, "key": key, "hwid": hwid}, fh)
+        _harden_path(LICENSE_FILE, is_file=True)
+    except Exception:
+        pass
+
+
+def clear_license_record() -> None:
+    try:
+        if LICENSE_FILE.exists():
+            LICENSE_FILE.unlink()
+    except Exception:
+        pass
+
+
 def save_target_preferences(until_top: Optional[int], gain_points: Optional[float]) -> None:
     try:
         _ensure_config_dir()
@@ -518,12 +546,27 @@ class TaskOption:
 
 
 @dataclass
+class DragOption:
+    text: str
+    element: object
+
+
+@dataclass
+class DragTarget:
+    index: int
+    element: object
+    input_element: Optional[object]
+
+
+@dataclass
 class TaskData:
     text: str
     options: List[TaskOption]
     points_label: str
     dropdown_texts: List[List[str]]
     dropdown_ids: List[Optional[str]]
+    drag_targets: List[DragTarget]
+    drag_options: List[DragOption]
 
 
 Logger = Optional[Callable[[str], None]]
@@ -724,8 +767,8 @@ def read_top_points(driver) -> Optional[int]:
 
 HIDE_MEDIA_CSS = """
 * { image-rendering: auto !important; }
-img, .gxs-resource-image, .gxst-resource-image, .gxs-dnd-option,
-[style*="background-image"], .answer-box, .ui-draggable, .taskhtmlwrapper .image, .taskhtmlwrapper figure {
+img, .gxs-resource-image, .gxst-resource-image,
+[style*="background-image"], .taskhtmlwrapper .image, .taskhtmlwrapper figure {
   display: none !important;
 }
 """
@@ -824,46 +867,6 @@ def detect_chrome_version(binary_path: Optional[str]) -> Optional[int]:
     return None
 
 
-def reg_read(name: str) -> Optional[str]:
-    if not is_windows():
-        return None
-    try:
-        import winreg
-
-        key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, REG_PATH, 0, winreg.KEY_READ)
-        val, _ = winreg.QueryValueEx(key, name)
-        winreg.CloseKey(key)
-        return str(val)
-    except Exception:
-        return None
-
-
-def reg_write(name: str, value: str) -> None:
-    if not is_windows():
-        return
-    try:
-        import winreg
-
-        key = winreg.CreateKey(winreg.HKEY_CURRENT_USER, REG_PATH)
-        winreg.SetValueEx(key, name, 0, winreg.REG_SZ, value)
-        winreg.CloseKey(key)
-    except Exception:
-        pass
-
-
-def reg_delete(name: str) -> None:
-    if not is_windows():
-        return
-    try:
-        import winreg
-
-        key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, REG_PATH, 0, winreg.KEY_SET_VALUE)
-        winreg.DeleteValue(key, name)
-        winreg.CloseKey(key)
-    except Exception:
-        pass
-
-
 # ----------------------- Licensing -----------------------
 
 
@@ -872,41 +875,29 @@ class LicenseManager:
         self.lang = lang
         self.logger = logger
         self._tier_cache: Dict[str, Optional[str]] = {"user": None, "key": None, "value": None, "ts": 0.0}
+        self._trial_forced_end = False
 
-    def _trial_seconds_left(self) -> int:
-        if not is_windows():
+    def _trial_seconds_left(self, ks_user: Optional[str]) -> int:
+        if self._trial_forced_end or not ks_user:
             return 0
-        if reg_read("TrialBurned") == "1":
-            return 0
-        start_epoch = reg_read("TrialStartEpoch")
-        if not start_epoch:
-            reg_write("TrialStartEpoch", str(time.time()))
-            log_message(T(self.lang, "lic_start_trial"), self.logger)
-            return TRIAL_MINUTES * 60
         try:
-            used = time.time() - float(start_epoch)
-        except Exception:
-            used = TRIAL_MINUTES * 60 + 1
-        left = int(max(0, TRIAL_MINUTES * 60 - used))
-        if left > 0:
-            log_message(T(self.lang, "lic_trial_left", m=int(left / 60)), self.logger)
-        else:
+            res = requests.get(KEYSYS_BASE + "/trial", params={"user": ks_user}, timeout=10)
+            js = res.json()
+            if js.get("valid") and js.get("trial") == "active":
+                left = int(js.get("remaining_seconds") or 0)
+                log_message(T(self.lang, "lic_trial_left", m=int(left / 60)), self.logger)
+                return max(0, left)
             log_message(T(self.lang, "lic_trial_expired"), self.logger)
-        return left
+        except Exception as e:
+            log_message(T(self.lang, "lic_error", e=str(e)), self.logger)
+        return 0
 
     def burn_trial(self) -> None:
-        if not is_windows():
-            return
-        reg_write("TrialBurned", "1")
-        reg_write("TrialStartEpoch", "0")
+        self._trial_forced_end = True
         log_message(T(self.lang, "lic_burned"), self.logger)
 
-    def _stored(self) -> Tuple[str, str, str]:
-        return (
-            reg_read("LicenseUser") or "",
-            reg_read("LicenseKey") or "",
-            reg_read("LicenseHWID") or "",
-        )
+    def _stored(self) -> Tuple[str, str, Optional[str]]:
+        return load_license_record()
 
     def _get_tier(self, ks_user: str, ks_key: str) -> Optional[str]:
         if not ks_user and not ks_key:
@@ -941,92 +932,73 @@ class LicenseManager:
         }
         return tier
 
+    def _request_nonce(self, ks_user: str, ks_key: str) -> Optional[str]:
+        try:
+            res = requests.get(KEYSYS_BASE + "/challenge", params={"user": ks_user, "key": ks_key}, timeout=10)
+            js = res.json()
+            return js.get("nonce")
+        except Exception:
+            return None
+
+    def _sign_nonce(self, ks_key: str, nonce: str, hwid: str) -> str:
+        digest = hmac.new(ks_key.encode("utf-8"), f"{nonce}{hwid}".encode("utf-8"), hashlib.sha256).digest()
+        return base64.b64encode(digest).decode("utf-8")
+
     def validate_and_store(self, ks_user: str, ks_key: str) -> Tuple[bool, str]:
-        """Validate via Keysys POST /validate (bind HWID on first success). Requires user+key."""
         if not ks_user or not ks_key:
             msg = T(self.lang, "lic_invalid")
             log_message(msg, self.logger)
             return False, msg
-        hwid = reg_read("LicenseHWID") or get_hwid()
+        hwid = load_license_record()[2] or get_hwid()
+        nonce = self._request_nonce(ks_user, ks_key)
+        if not nonce:
+            msg = T(self.lang, "lic_error", e="nonce_unavailable")
+            log_message(msg, self.logger)
+            return False, msg
+        signature = self._sign_nonce(ks_key, nonce, hwid)
         try:
             res = requests.post(
                 KEYSYS_VALIDATE,
-                json={"user": ks_user, "key": ks_key, "hwid": hwid},
+                json={"user": ks_user, "key": ks_key, "hwid": hwid, "nonce": nonce, "signature": signature},
                 timeout=12,
             )
             js = res.json()
             if js.get("valid"):
-                reg_write("LicenseUser", ks_user)
-                reg_write("LicenseKey", ks_key)
-                reg_write("LicenseHWID", js.get("hwid") or hwid)
+                hwid_remote = js.get("hwid") or hwid
+                save_license_record(ks_user, ks_key, hwid_remote)
                 self.burn_trial()
                 log_message(T(self.lang, "lic_valid", u=js.get("user", ks_user)), self.logger)
                 return True, js.get("user", ks_user)
             if js.get("revoked"):
+                clear_license_record()
                 msg = T(self.lang, "lic_revoked", r=js.get("reason", ""))
                 log_message(msg, self.logger)
                 return False, msg
-            message = (js.get("message") or "").lower()
-            if "hwid mismatch" in message:
-                msg = T(self.lang, "lic_hwid_mismatch")
+            if js.get("expired"):
+                clear_license_record()
+                msg = T(self.lang, "lic_invalid")
                 log_message(msg, self.logger)
                 return False, msg
-            if "not bound" in message:
-                res2 = requests.post(
-                    KEYSYS_VALIDATE,
-                    json={"user": ks_user, "key": ks_key, "hwid": hwid},
-                    timeout=12,
-                )
-                js2 = res2.json()
-                if js2.get("valid"):
-                    reg_write("LicenseUser", ks_user)
-                    reg_write("LicenseKey", ks_key)
-                    reg_write("LicenseHWID", js2.get("hwid") or hwid)
-                    self.burn_trial()
-                    log_message(T(self.lang, "lic_valid", u=js2.get("user", ks_user)), self.logger)
-                    return True, js2.get("user", ks_user)
-            msg = T(self.lang, "lic_invalid")
-            log_message(msg, self.logger)
-            return False, msg
+            message = js.get("message") or T(self.lang, "lic_invalid")
+            log_message(message, self.logger)
+            return False, message
         except Exception as e:  # pragma: no cover - network safety
             msg = T(self.lang, "lic_error", e=str(e))
             log_message(msg, self.logger)
             return False, msg
 
     def status(self) -> Dict[str, Optional[str]]:
-        ks_user, ks_key, ks_hwid = self._stored()
+        ks_user, ks_key, _ = self._stored()
         if ks_user and ks_key:
-            try:
-                q = {"user": ks_user, "key": ks_key}
-                q["hwid"] = ks_hwid or get_hwid()
-                r = requests.get(KEYSYS_VALIDATE, params=q, timeout=8)
-                js = r.json()
-                if js.get("valid"):
-                    if js.get("hwid"):
-                        reg_write("LicenseHWID", js["hwid"])
-                    tier = self._get_tier(js.get("user") or ks_user, ks_key) or "Basic"
-                    return {
-                        "state": "licensed",
-                        "user": js.get("user") or ks_user,
-                        "left_seconds": None,
-                        "tier": tier,
-                    }
-                if js.get("revoked"):
-                    reg_delete("LicenseUser")
-                    reg_delete("LicenseKey")
-                    reg_delete("LicenseHWID")
-                else:
-                    if (js.get("message") or "").lower().find("mismatch") >= 0:
-                        pass
-                    reg_delete("LicenseUser")
-                    reg_delete("LicenseKey")
-            except Exception:
-                return {"state": "licensed", "user": ks_user or "unknown", "left_seconds": None}
+            ok, _ = self.validate_and_store(ks_user, ks_key)
+            if ok:
+                tier = self._get_tier(ks_user, ks_key) or "Basic"
+                return {"state": "licensed", "user": ks_user, "left_seconds": None, "tier": tier}
 
-        left = self._trial_seconds_left()
+        left = self._trial_seconds_left(ks_user)
         if left > 0:
-            return {"state": "trial", "user": None, "left_seconds": left}
-        return {"state": "expired", "user": None, "left_seconds": 0}
+            return {"state": "trial", "user": ks_user, "left_seconds": left}
+        return {"state": "expired", "user": ks_user, "left_seconds": 0}
 
     def ensure_for_cli(
         self,
@@ -1215,6 +1187,29 @@ def select_task(driver, lang: str, logger: Logger = None) -> bool:
     return False
 
 
+def transcribe_audio_via_worker(audio_url: str, lang: str, logger: Logger = None) -> Optional[str]:
+    payload = {"audio_url": audio_url, "language": lang}
+    try:
+        response = requests.post(f"{KEYSYS_BASE}/transcribe", json=payload, timeout=25)
+    except Exception as exc:  # pragma: no cover - network
+        log_message(f"⚠️ Audio transcription request failed: {exc}", logger)
+        return None
+
+    try:
+        data = response.json()
+    except Exception:
+        log_message(
+            f"⚠️ Audio transcription failed with status {response.status_code}", logger
+        )
+        return None
+
+    if response.ok and data.get("success") and data.get("text"):
+        return str(data.get("text"))
+
+    log_message(f"⚠️ Audio transcription failed: {data.get('message')}", logger)
+    return None
+
+
 def fetch_task(driver, lang: str, logger: Logger = None) -> Optional[TaskData]:
     wrapper = w(driver, "#taskhtml > div", 10, "visible")
     if wrapper is None:
@@ -1229,13 +1224,57 @@ def fetch_task(driver, lang: str, logger: Logger = None) -> Optional[TaskData]:
     pts_el = driver.find_elements(By.CSS_SELECTOR, ".obj-points")
     if pts_el:
         points_label = pts_el[0].text.strip()
+    drag_fields = wrapper.find_elements(By.CSS_SELECTOR, ".gxs-dnd-field")
+    drag_options_raw = wrapper.find_elements(By.CSS_SELECTOR, ".gxs-dnd-option")
+    drag_targets: List[DragTarget] = []
+    drag_options: List[DragOption] = []
+
+    for idx, field in enumerate(drag_fields, start=1):
+        hidden = None
+        try:
+            hid_id = field.get_attribute("id") or ""
+            if hid_id:
+                hidden = wrapper.find_element(By.CSS_SELECTOR, f"input[id='dnd{hid_id}']")
+        except Exception:
+            hidden = None
+        drag_targets.append(DragTarget(index=idx, element=field, input_element=hidden))
+
+    for opt in drag_options_raw:
+        txt = (opt.text or "").strip()
+        if not txt:
+            txt = (opt.get_attribute("innerText") or "").strip()
+        drag_options.append(DragOption(text=txt, element=opt))
+
+    has_drag = bool(drag_targets and drag_options)
+
     media = wrapper.find_elements(
         By.CSS_SELECTOR,
-        "img,[style*='background-image'],.gxs-resource-image,.gxst-resource-image,.gxs-dnd-option,.answer-box,.ui-draggable",
+        "img,[style*='background-image'],.gxs-resource-image,.gxst-resource-image",
     )
-    if media:
+    if media and not has_drag:
         log_message(T(lang, "img_task_skip"), logger)
         return "SKIP"
+
+    audio_sources = wrapper.find_elements(By.CSS_SELECTOR, "audio, audio source")
+    audio_url = None
+    for aud in audio_sources:
+        src = (aud.get_attribute("src") or "").strip()
+        if src:
+            audio_url = src
+            break
+    if drag_options:
+        option_texts = [o.text for o in drag_options if o.text]
+        if option_texts:
+            text_content = f"{text_content}\nAtbilžu varianti: " + ", ".join(option_texts)
+    if audio_url:
+        full_audio_url = urljoin(driver.current_url, audio_url)
+        log_message("🎵 Audio task detected – transcribing…", logger)
+        transcription = transcribe_audio_via_worker(full_audio_url, lang, logger)
+        if transcription:
+            log_message(f"🎵 Audio text: {transcription}", logger)
+            text_content = f"{text_content}\n\nAudio transcription: {transcription}"
+        else:
+            log_message("⚠️ Audio transcription failed", logger)
     options: List[TaskOption] = []
     for idx, item in enumerate(
         wrapper.find_elements(By.CSS_SELECTOR, "ul.gxs-answer-select > li"), start=1
@@ -1276,6 +1315,8 @@ def fetch_task(driver, lang: str, logger: Logger = None) -> Optional[TaskData]:
         points_label=points_label,
         dropdown_texts=dropdown_texts,
         dropdown_ids=dropdown_ids,
+        drag_targets=drag_targets,
+        drag_options=drag_options,
     )
 
 
@@ -1323,6 +1364,13 @@ class ChatGPTSession:
         self._client_lock = threading.Lock()
         self.model = "gpt-5.1-latest-chat"
         self.api_key = os.getenv("UZDEVUMI_OPENAI_KEY") or DEFAULT_OPENAI_KEY
+        if not self.api_key:
+            token = fetch_chatgpt5free_token(max_wait=10.0)
+            if token and token.startswith("Bearer "):
+                token = token[len("Bearer ") :]
+            self.api_key = token
+        if not self.api_key:
+            raise RuntimeError("OpenAI API key missing. Set UZDEVUMI_OPENAI_KEY or configure the worker key store.")
         self.client = AsyncOpenAI(api_key=self.api_key, timeout=15)
         self._loop = asyncio.new_event_loop()
         self._loop_thread = threading.Thread(
@@ -1437,6 +1485,27 @@ def parse_answer(answer: str, task: TaskData):
     lines = [line.strip() for line in answer.splitlines() if line.strip()]
     if not lines:
         return {"mode": "empty", "values": []}
+
+    if task.drag_targets and task.drag_options:
+        option_texts = [o.text.lower() for o in task.drag_options]
+        values: List[int] = []
+        for i in range(len(task.drag_targets)):
+            line = lines[i] if i < len(lines) else (lines[-1] if lines else "")
+            chosen_idx = None
+            if line:
+                mnum = re.findall(r"\d+", line)
+                if mnum:
+                    k = int(mnum[0])
+                    if 1 <= k <= len(option_texts):
+                        chosen_idx = k
+                if chosen_idx is None:
+                    normalized = line.lower()
+                    for j, txt in enumerate(option_texts, start=1):
+                        if normalized == txt or (normalized and normalized in txt):
+                            chosen_idx = j
+                            break
+            values.append(chosen_idx or 1)
+        return {"mode": "drag", "values": values}
 
     if task.dropdown_texts:
         values: List[int] = []
@@ -1632,6 +1701,46 @@ def fill_dropdowns(
         log_message(T(lang, "no_btn"), logger)
 
 
+def fill_drag_targets(driver, task: TaskData, values: List[int], lang, logger: Logger = None):
+    if not task.drag_targets or not task.drag_options:
+        log_message(T(lang, "no_inputs"), logger)
+        return
+
+    for i, target in enumerate(task.drag_targets):
+        if i >= len(values):
+            break
+        choice_idx = values[i]
+        if not (1 <= choice_idx <= len(task.drag_options)):
+            continue
+        option = task.drag_options[choice_idx - 1]
+        try:
+            ActionChains(driver).move_to_element(option.element).click_and_hold().pause(0.1).move_to_element(target.element).pause(0.1).release().perform()
+        except Exception:
+            try:
+                js_click(driver, target.element)
+                js_click(driver, option.element)
+            except Exception:
+                continue
+
+        try:
+            data_id = option.element.get_attribute("data-id") or option.text
+            if target.input_element and data_id:
+                driver.execute_script(
+                    "arguments[0].value = arguments[1]; arguments[0].dispatchEvent(new Event('change', {bubbles:true}));",
+                    target.input_element,
+                    data_id,
+                )
+        except Exception:
+            pass
+
+    submit_button = w(driver, "#submitAnswerBtn", 6, "clickable")
+    if submit_button is not None:
+        js_click(driver, submit_button)
+        log_message(T(lang, "submitted"), logger)
+    else:
+        log_message(T(lang, "no_btn"), logger)
+
+
 # ----------------------- Orchestrator -------------------
 
 def solve_one_task(main_driver, gpt: ChatGPTSession, lang: str, logger: Logger = None) -> float:
@@ -1685,6 +1794,8 @@ def solve_one_task(main_driver, gpt: ChatGPTSession, lang: str, logger: Logger =
 
     if parsed["mode"] == "dropdowns" and task.dropdown_texts:
         fill_dropdowns(main_driver, task.dropdown_texts, task.dropdown_ids, parsed["values"], lang, logger)
+    elif parsed["mode"] == "drag" and task.drag_targets and task.drag_options:
+        fill_drag_targets(main_driver, task, parsed["values"], lang, logger)
     elif parsed["mode"] == "select" and task.options:
         select_answers(main_driver, task, parsed["values"], lang, logger)
     elif parsed["mode"] == "text" and parsed["values"]:
