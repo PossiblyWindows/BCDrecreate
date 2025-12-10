@@ -556,6 +556,12 @@ var index_default = {
     }
     __name(clailaFallbackChat, "clailaFallbackChat");
     try {
+      if (!env.LICENSES_KV) {
+        return json(
+          { error: "LICENSES_KV binding missing" },
+          { status: 500 }
+        );
+      }
       if (url.pathname === "/favicon.ico") {
         return new Response("", { status: 204 });
       }
@@ -585,6 +591,9 @@ var index_default = {
             "Admin password not configured in environment (GUI_PASSWORD).",
             { status: 500 }
           );
+        }
+        if (!env.ADMIN_SESSIONS_KV) {
+          return new Response("ADMIN_SESSIONS_KV not configured", { status: 500 });
         }
         if (pass === configured) {
           let sessionToken;
