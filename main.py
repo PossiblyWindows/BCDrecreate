@@ -234,6 +234,8 @@ I18N = {
         "p6": "- Dropdowniem: katrai rindai izvēlies vienu (burts A/B/C… vai teksts).",
         "p7": "- Bez paskaidrojumiem. Viena īsa atbilde ar tikai gala rezultātu.",
         "p8": "Uzdevuma teksts:",
+        "p9": "Ja pievienots attēls, izmanto to un dod konkrētu atbildi (var būt viens vārds/skaitlis).",
+        "p_image": "Pievienots attēls. Izmanto to, lai sniegtu precīzu atbildi.",
         "p_radio_hdr": "Varianti (radio/checkbox):",
         "p_drop_hdr": "Varianti (dropdown):",
         # License logs
@@ -250,6 +252,21 @@ I18N = {
         "creds_saved": "Pierakstīšanās dati saglabāti.",
         "creds_loaded": "Ielādēti saglabātie pierakstīšanās dati.",
         "creds_cleared": "Saglabātie pierakstīšanās dati dzēsti.",
+        "audio_detected": "🎵 Atklāts audio uzdevums — notiek transkribēšana…",
+        "audio_failed": "⚠️ Neizdevās transkribēt audio",
+        "audio_text": "🎵 Audio teksts: {x}",
+        "worker_missing_key": "⚠️ Trūkst licences atslēga worker čatam — izlaižam pieprasījumu",
+        "worker_request_failed": "⚠️ Neizdevās worker AI pieprasījums: {x}",
+        "worker_rejected": "⚠️ Worker AI noraidīja pieprasījumu ({c}): {m}",
+        "worker_empty_reply": "⚠️ Worker AI atgrieza tukšu atbildi",
+        "worker_fallback": "⚠️ Worker AI kļūme — izmantojam vietējo GPT",
+        "token_refreshed": "↺ GPT marķieris atjaunots",
+        "retry_wait": "↻ …",
+        "token_fetch": "⚠️ Iegūstam jaunu marķieri…",
+        "token_retry": "↻ Mēģinu vēlreiz ar jaunu GPT marķieri",
+        "token_skip_again": "⚠️ izlaižam uzdevumu (atkārtoti)",
+        "token_missing": "⚠️ marķieris nav atrasts — izlaižam uzdevumu",
+        "restart_browsers": "↻ Pārlādējam pārlūkus…",
     },
     "en": {
         "title": "Uzdevumi.lv bot",
@@ -316,6 +333,8 @@ I18N = {
         "p6": "- Dropdowns: for each line choose one (letter A/B/C… or visible text).",
         "p7": "- No explanations. One short message with only the final result.",
         "p8": "Task text:",
+        "p9": "If an image is attached, use it and return a concrete answer (single word/number is fine).",
+        "p_image": "An image is attached. Use it to provide a precise answer.",
         "p_radio_hdr": "Options (radio/checkbox):",
         "p_drop_hdr": "Options (dropdown):",
         "lic_start_trial": "Trial started.",
@@ -331,6 +350,21 @@ I18N = {
         "creds_saved": "Credentials saved.",
         "creds_loaded": "Loaded saved credentials.",
         "creds_cleared": "Saved credentials cleared.",
+        "audio_detected": "🎵 Audio task detected – transcribing…",
+        "audio_failed": "⚠️ Audio transcription failed",
+        "audio_text": "🎵 Audio text: {x}",
+        "worker_missing_key": "⚠️ Licence key missing for worker chat; skipping request",
+        "worker_request_failed": "⚠️ Worker AI request failed: {x}",
+        "worker_rejected": "⚠️ Worker AI rejected request ({c}): {m}",
+        "worker_empty_reply": "⚠️ Worker AI returned an empty reply",
+        "worker_fallback": "⚠️ Worker AI failed — falling back to local GPT",
+        "token_refreshed": "↺ GPT token refreshed",
+        "retry_wait": "↻ …",
+        "token_fetch": "⚠️ fetching new token…",
+        "token_retry": "↻ Retrying GPT task with new token",
+        "token_skip_again": "⚠️ skipping task (again)",
+        "token_missing": "⚠️ token not found — skipping task",
+        "restart_browsers": "↻ Restarting browsers…",
     },
     "ru": {
         "title": "Uzdevumi.lv bot",
@@ -397,6 +431,8 @@ I18N = {
         "p6": "- Выпадающие списки: для каждой строки выберите одно (буква A/B/C… либо видимый текст).",
         "p7": "- Без пояснений. Одно короткое сообщение только с итогом.",
         "p8": "Текст задания:",
+        "p9": "Если приложено изображение, используйте его и дайте конкретный ответ (возможно одно слово/число).",
+        "p_image": "К заданию приложено изображение. Используйте его для точного ответа.",
         "p_radio_hdr": "Варианты (radio/checkbox):",
         "p_drop_hdr": "Варианты (dropdown):",
         "lic_start_trial": "Пробный период запущен.",
@@ -412,6 +448,21 @@ I18N = {
         "creds_saved": "Данные входа сохранены.",
         "creds_loaded": "Сохранённые данные входа загружены.",
         "creds_cleared": "Сохранённые данные входа удалены.",
+        "audio_detected": "🎵 Обнаружено аудио-задание — идёт транскрипция…",
+        "audio_failed": "⚠️ Не удалось транскрибировать аудио",
+        "audio_text": "🎵 Текст аудио: {x}",
+        "worker_missing_key": "⚠️ Отсутствует лицензионный ключ для worker-чата — пропускаем запрос",
+        "worker_request_failed": "⚠️ Ошибка запроса к Worker AI: {x}",
+        "worker_rejected": "⚠️ Worker AI отклонил запрос ({c}): {m}",
+        "worker_empty_reply": "⚠️ Worker AI вернул пустой ответ",
+        "worker_fallback": "⚠️ Сбой Worker AI — используем локальный GPT",
+        "token_refreshed": "↺ Токен GPT обновлён",
+        "retry_wait": "↻ …",
+        "token_fetch": "⚠️ Получаем новый токен…",
+        "token_retry": "↻ Повторяем с новым токеном GPT",
+        "token_skip_again": "⚠️ пропускаем задачу (снова)",
+        "token_missing": "⚠️ токен не найден — пропускаем задачу",
+        "restart_browsers": "↻ Перезапускаем браузеры…",
     },
 }
 
@@ -1206,21 +1257,20 @@ def transcribe_audio_via_worker(audio_url: str, lang: str, logger: Logger = None
     try:
         response = requests.post(f"{KEYSYS_BASE}/transcribe", json=payload, timeout=25)
     except Exception as exc:  # pragma: no cover - network
-        log_message(f"⚠️ Audio transcription request failed: {exc}", logger)
+        log_message(T(lang, "audio_failed"), logger)
+        log_message(str(exc), logger)
         return None
 
     try:
         data = response.json()
     except Exception:
-        log_message(
-            f"⚠️ Audio transcription failed with status {response.status_code}", logger
-        )
+        log_message(T(lang, "audio_failed"), logger)
         return None
 
     if response.ok and data.get("success") and data.get("text"):
         return str(data.get("text"))
 
-    log_message(f"⚠️ Audio transcription failed: {data.get('message')}", logger)
+    log_message(T(lang, "audio_failed"), logger)
     return None
 
 
@@ -1292,13 +1342,13 @@ def fetch_task(driver, lang: str, logger: Logger = None) -> Optional[TaskData]:
             text_content = f"{text_content}\nAtbilžu varianti: " + ", ".join(option_texts)
     if audio_url:
         full_audio_url = urljoin(driver.current_url, audio_url)
-        log_message("🎵 Audio task detected – transcribing…", logger)
+        log_message(T(lang, "audio_detected"), logger)
         transcription = transcribe_audio_via_worker(full_audio_url, lang, logger)
         if transcription:
-            log_message(f"🎵 Audio text: {transcription}", logger)
+            log_message(T(lang, "audio_text", x=transcription), logger)
             text_content = f"{text_content}\n\nAudio transcription: {transcription}"
         else:
-            log_message("⚠️ Audio transcription failed", logger)
+            log_message(T(lang, "audio_failed"), logger)
     options: List[TaskOption] = []
     for idx, item in enumerate(
         wrapper.find_elements(By.CSS_SELECTOR, "ul.gxs-answer-select > li"), start=1
@@ -1416,12 +1466,23 @@ class ChatGPTSession:
 
     async def _ask_task_async(self, task: TaskData) -> str:
         prompt = build_prompt(task, self.lang)
+        user_content: object = prompt
+        if task.images_base64:
+            content_blocks: List[Dict[str, object]] = [{"type": "text", "text": prompt}]
+            for img in task.images_base64:
+                content_blocks.append(
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": f"data:image/png;base64,{img}"},
+                    }
+                )
+            user_content = content_blocks
         log_message(T(self.lang, "open_gpt"), self.logger)
         resp = await self.client.chat.completions.create(
             model=self.model,
             messages=[
                 {"role": "system", "content": T(self.lang, "p1")},
-                {"role": "user", "content": prompt},
+                {"role": "user", "content": user_content},
             ],
             temperature=0.2,
             max_tokens=1024,
@@ -1458,7 +1519,7 @@ class ChatGPTSession:
         if token.startswith("Bearer "):
             token = token[len("Bearer ") :]
         self._swap_client(token)
-        log_message("↺ GPT token refreshed", self.logger)
+        log_message(T(self.lang, "token_refreshed"), self.logger)
 
     def _swap_client(self, new_key: str) -> None:
         with self._client_lock:
@@ -1490,7 +1551,7 @@ class KeysysChatClient:
     def ask(self, prompt: str, image_b64: Optional[str] = None) -> str:
         self._refresh_license()
         if not self.ks_key:
-            self._log("⚠️ Licence key missing for worker chat; skipping request")
+            self._log(T(self.lang, "worker_missing_key"))
             return ""
 
         payload: Dict[str, object] = {"key": self.ks_key, "message": prompt}
@@ -1505,19 +1566,24 @@ class KeysysChatClient:
             res = requests.post(f"{KEYSYS_BASE}/msg", json=payload, timeout=25)
             data = res.json()
         except Exception as exc:  # pragma: no cover - network safety
-            self._log(f"⚠️ Worker AI request failed: {exc}")
+            self._log(T(self.lang, "worker_request_failed", x=exc))
             return ""
 
         if not res.ok or not data.get("success"):
             status_note = data.get("message") if isinstance(data, dict) else None
             self._log(
-                f"⚠️ Worker AI rejected request ({res.status_code}): {status_note or 'unknown error'}"
+                T(
+                    self.lang,
+                    "worker_rejected",
+                    c=res.status_code,
+                    m=status_note or "unknown error",
+                )
             )
             return ""
 
         reply = data.get("reply") or data.get("message") or ""
         if not reply:
-            self._log("⚠️ Worker AI returned an empty reply")
+            self._log(T(self.lang, "worker_empty_reply"))
         return str(reply)
 
 
@@ -1550,10 +1616,12 @@ def build_prompt(task: TaskData, lang: str) -> str:
             lines.append(f"{i}) " + " | ".join(lettered))
         parts.extend(["", T(lang, "p_drop_hdr"), "\n".join(lines)])
     if task.images_base64:
+        parts.append("")
+        parts.append(T(lang, "p9"))
         parts.extend(
             [
                 "",
-                "An image is attached to this prompt. Use it to answer if relevant.",
+                T(lang, "p_image"),
             ]
         )
     return "\n".join(parts)
@@ -1840,10 +1908,10 @@ def solve_one_task(
     for _ in range(12):
         task = select_and_fetch()
         if task == "SKIP":
-            log_message("↻ …", logger)
+            log_message(T(lang, "retry_wait"), logger)
             continue
         if task is None:
-            log_message("↻ …", logger)
+            log_message(T(lang, "retry_wait"), logger)
             continue
         break
 
@@ -1858,7 +1926,7 @@ def solve_one_task(
             image_b64 = task.images_base64[0] if task.images_base64 else None
             answer = worker_ai.ask(prompt, image_b64=image_b64)
         except Exception:
-            log_message("⚠  worker AI failed — falling back to local GPT", logger)
+            log_message(T(lang, "worker_fallback"), logger)
             answer = ""
 
     if not answer:
@@ -1870,20 +1938,20 @@ def solve_one_task(
             ):
                 raise RuntimeError("GPT fallback skipped or failed — retrying with new token")
         except Exception:
-            log_message("⚠  fetching new token…", logger)
+            log_message(T(lang, "token_fetch"), logger)
             new_token = fetch_chatgpt5free_token(max_wait=8.0)
             if new_token and new_token.startswith("Bearer "):
                 new_token = new_token[len("Bearer ") :]
             if new_token:
                 gpt._swap_client(new_token)
-                log_message("↻ Retrying GPT task with new token", logger)
+                log_message(T(lang, "token_retry"), logger)
                 try:
                     answer = gpt.ask_task(task)
                 except Exception:
-                    log_message("⚠  skipping task (again)", logger)
+                    log_message(T(lang, "token_skip_again"), logger)
                     return 0.0
             else:
-                log_message("⚠  token not found — skipping task", logger)
+                log_message(T(lang, "token_missing"), logger)
                 return 0.0
 
     parsed = parse_answer(answer, task)
@@ -1977,7 +2045,7 @@ def run_automation(
             try:
                 _ = solve_one_task(driver, gpt_session, worker_ai, lang, logger)
             except Exception:
-                log_message("↻ Restarting browsers…", logger)
+                log_message(T(lang, "restart_browsers"), logger)
                 recreate_main()
                 with_resilience(
                     lambda: login(driver, user, password, lang, logger),
