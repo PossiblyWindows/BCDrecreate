@@ -1,70 +1,67 @@
-
 var __defProp = Object.defineProperty;
 var __name = (target, value) => __defProp(target, "name", { value, configurable: true });
 
-// index.js (modified: password-protected /guiaddinfo + GUI to set OpenAI API key stored in CONFIG_KV + IP restriction)
-var __defProp2 = Object.defineProperty;
-var __name2 = /* @__PURE__ */ __name((target, value) => __defProp2(target, "name", { value, configurable: true }), "__name");
+// index.js
 var index_default = {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
-    const safeJSON = /* @__PURE__ */ __name2((s) => {
+    function safeJSON(s) {
       try {
         return s ? JSON.parse(s) : null;
       } catch {
         return null;
       }
-    }, "safeJSON");
-    const json = /* @__PURE__ */ __name2(
-      (o, init = {}) => new Response(JSON.stringify(o), {
+    }
+    __name(safeJSON, "safeJSON");
+    function json(o, init = {}) {
+      return new Response(JSON.stringify(o), {
         headers: { "Content-Type": "application/json" },
         ...init
-      }),
-      "json"
-    );
-    const obfJson = /* @__PURE__ */ __name2(
-      (o, init = {}) => {
-        const entries = Object.entries(o);
-        for (let i = entries.length - 1; i > 0; i--) {
-          const j = Math.floor(Math.random() * (i + 1));
-          [entries[i], entries[j]] = [entries[j], entries[i]];
-        }
-        const out = {};
-        for (const [k, v] of entries) out[k] = v;
-        const padChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-        const padLen = 12 + Math.floor(Math.random() * 13);
-        let pad = "";
-        for (let i = 0; i < padLen; i++) pad += padChars[Math.floor(Math.random() * padChars.length)];
-        out.pad = pad;
-        return new Response(JSON.stringify(out), {
-          headers: { "Content-Type": "application/json" },
-          ...init
-        });
-      },
-      "obfJson"
-    );
+      });
+    }
+    __name(json, "json");
+    function obfJson(o, init = {}) {
+      const entries = Object.entries(o);
+      for (let i = entries.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [entries[i], entries[j]] = [entries[j], entries[i]];
+      }
+      const out = {};
+      for (const [k, v] of entries) out[k] = v;
+      const padChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+      const padLen = 12 + Math.floor(Math.random() * 13);
+      let pad = "";
+      for (let i = 0; i < padLen; i++) {
+        pad += padChars[Math.floor(Math.random() * padChars.length)];
+      }
+      out.pad = pad;
+      return new Response(JSON.stringify(out), {
+        headers: { "Content-Type": "application/json" },
+        ...init
+      });
+    }
+    __name(obfJson, "obfJson");
     const ALLOWED_TIERS = ["Basic", "Basic+", "Pro", "Premium"];
-    const genKey = /* @__PURE__ */ __name2(() => {
+    function genKey() {
       const c = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-      const part = /* @__PURE__ */ __name2(
-        () => Array.from({ length: 6 }, () => c[Math.floor(Math.random() * c.length)]).join(""),
-        "part"
-      );
+      const part = /* @__PURE__ */ __name(() => Array.from({ length: 6 }, () => c[Math.floor(Math.random() * c.length)]).join(""), "part");
       return Array(6).fill(0).map(part).join("-");
-    }, "genKey");
-    const absRedirect = /* @__PURE__ */ __name2((path, code = 302) => {
+    }
+    __name(genKey, "genKey");
+    function absRedirect(path, code = 302) {
       const absolute = path.startsWith("http") ? path : `${url.origin}${path.startsWith("/") ? path : `/${path}`}`;
       return Response.redirect(absolute, code);
-    }, "absRedirect");
-    const escapeHTML = /* @__PURE__ */ __name2(
-      (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\"/g, "&quot;").replace(/'/g, "&#39;"),
-      "escapeHTML"
-    );
-    const getRec = /* @__PURE__ */ __name2(
-      async (user) => safeJSON(await env.LICENSES_KV.get(user)),
-      "getRec"
-    );
-    const findLicenseByKeyOrUser = /* @__PURE__ */ __name2(async (maybeKeyOrUser) => {
+    }
+    __name(absRedirect, "absRedirect");
+    function escapeHTML(s) {
+      return String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\"/g, "&quot;").replace(/'/g, "&#39;");
+    }
+    __name(escapeHTML, "escapeHTML");
+    async function getRec(user) {
+      return safeJSON(await env.LICENSES_KV.get(user));
+    }
+    __name(getRec, "getRec");
+    async function findLicenseByKeyOrUser(maybeKeyOrUser) {
       try {
         const direct = await env.LICENSES_KV.get(maybeKeyOrUser);
         if (direct !== null) {
@@ -89,15 +86,18 @@ var index_default = {
       } catch (e) {
       }
       return null;
-    }, "findLicenseByKeyOrUser");
-    const bytesToBase64 = /* @__PURE__ */ __name2((bytes) => {
+    }
+    __name(findLicenseByKeyOrUser, "findLicenseByKeyOrUser");
+    function bytesToBase64(bytes) {
       let binary = "";
-      const len = bytes.byteLength || bytes.length;
       const view = new Uint8Array(bytes);
-      for (let i = 0; i < len; i++) binary += String.fromCharCode(view[i]);
+      for (let i = 0; i < view.length; i++) {
+        binary += String.fromCharCode(view[i]);
+      }
       return btoa(binary);
-    }, "bytesToBase64");
-    const base64ToBytes = /* @__PURE__ */ __name2((b64) => {
+    }
+    __name(bytesToBase64, "bytesToBase64");
+    function base64ToBytes(b64) {
       try {
         const bin = atob(b64);
         const arr = new Uint8Array(bin.length);
@@ -106,41 +106,54 @@ var index_default = {
       } catch {
         return null;
       }
-    }, "base64ToBytes");
-    const hexToBytes = /* @__PURE__ */ __name2((hex) => {
+    }
+    __name(base64ToBytes, "base64ToBytes");
+    function hexToBytes(hex) {
       try {
         if (hex.length % 2 !== 0) return null;
         const arr = new Uint8Array(hex.length / 2);
-        for (let i = 0; i < hex.length; i += 2) arr[i / 2] = parseInt(hex.substr(i, 2), 16);
+        for (let i = 0; i < hex.length; i += 2) {
+          arr[i / 2] = parseInt(hex.substr(i, 2), 16);
+        }
         return arr.buffer;
       } catch {
         return null;
       }
-    }, "hexToBytes");
-    const bytesEqual = /* @__PURE__ */ __name2((a, b) => {
+    }
+    __name(hexToBytes, "hexToBytes");
+    function bytesEqual(a, b) {
       if (!(a instanceof Uint8Array)) a = new Uint8Array(a);
       if (!(b instanceof Uint8Array)) b = new Uint8Array(b);
       if (a.length !== b.length) return false;
       let res = 0;
       for (let i = 0; i < a.length; i++) res |= a[i] ^ b[i];
       return res === 0;
-    }, "bytesEqual");
-    const computeHMAC = /* @__PURE__ */ __name2(async (keyStr, message) => {
+    }
+    __name(bytesEqual, "bytesEqual");
+    async function computeHMAC(keyStr, message) {
       const enc = new TextEncoder();
       const keyData = enc.encode(keyStr);
-      const cryptoKey = await crypto.subtle.importKey("raw", keyData, { name: "HMAC", hash: "SHA-256" }, false, ["sign", "verify"]);
+      const cryptoKey = await crypto.subtle.importKey(
+        "raw",
+        keyData,
+        { name: "HMAC", hash: "SHA-256" },
+        false,
+        ["sign", "verify"]
+      );
       const sig = await crypto.subtle.sign("HMAC", cryptoKey, message);
       return new Uint8Array(sig);
-    }, "computeHMAC");
-    const parseSignature = /* @__PURE__ */ __name2((sigStr) => {
+    }
+    __name(computeHMAC, "computeHMAC");
+    function parseSignature(sigStr) {
       if (!sigStr) return null;
       const b = base64ToBytes(sigStr);
       if (b) return new Uint8Array(b);
       const h = hexToBytes(sigStr);
       if (h) return new Uint8Array(h);
       return null;
-    }, "parseSignature");
-    const kvIncrement = /* @__PURE__ */ __name2(async (kv, key, ttl = 60) => {
+    }
+    __name(parseSignature, "parseSignature");
+    async function kvIncrement(kv, key, ttl = 60) {
       try {
         const cur = await kv.get(key);
         let count = 0;
@@ -148,7 +161,7 @@ var index_default = {
           const parsed = parseInt(cur, 10);
           if (Number.isFinite(parsed)) count = parsed;
         }
-        count = count + 1;
+        count += 1;
         await kv.put(key, String(count), { expirationTtl: ttl });
         return count;
       } catch (e) {
@@ -158,8 +171,9 @@ var index_default = {
         }
         return 1;
       }
-    }, "kvIncrement");
-    const kvGetInt = /* @__PURE__ */ __name2(async (kv, key) => {
+    }
+    __name(kvIncrement, "kvIncrement");
+    async function kvGetInt(kv, key) {
       try {
         const cur = await kv.get(key);
         if (cur === null) return 0;
@@ -168,15 +182,17 @@ var index_default = {
       } catch {
         return 0;
       }
-    }, "kvGetInt");
-    const storeNonce = /* @__PURE__ */ __name2(async (nonce, user, ttl = 300) => {
+    }
+    __name(kvGetInt, "kvGetInt");
+    async function storeNonce(nonce, user, ttl = 300) {
       try {
         if (!env.NONCES_KV) return;
         await env.NONCES_KV.put(`nonce:${nonce}`, user, { expirationTtl: ttl });
       } catch (e) {
       }
-    }, "storeNonce");
-    const lookupNonce = /* @__PURE__ */ __name2(async (nonce) => {
+    }
+    __name(storeNonce, "storeNonce");
+    async function lookupNonce(nonce) {
       try {
         if (!env.NONCES_KV) return null;
         const u = await env.NONCES_KV.get(`nonce:${nonce}`);
@@ -184,13 +200,15 @@ var index_default = {
       } catch {
         return null;
       }
-    }, "lookupNonce");
-    const genRandomBase64 = /* @__PURE__ */ __name2((len = 32) => {
+    }
+    __name(lookupNonce, "lookupNonce");
+    function genRandomBase64(len = 32) {
       const arr = new Uint8Array(len);
       crypto.getRandomValues(arr);
       return bytesToBase64(arr);
-    }, "genRandomBase64");
-    const trialGet = /* @__PURE__ */ __name2(async (user) => {
+    }
+    __name(genRandomBase64, "genRandomBase64");
+    async function trialGet(user) {
       try {
         if (env.TRIALS_KV) {
           return safeJSON(await env.TRIALS_KV.get(`trial:${user}`));
@@ -200,28 +218,37 @@ var index_default = {
       } catch {
         return null;
       }
-    }, "trialGet");
-    const trialPut = /* @__PURE__ */ __name2(async (user, obj, ttlSeconds = null) => {
+    }
+    __name(trialGet, "trialGet");
+    async function trialPut(user, obj, ttlSeconds = null) {
       try {
         const s = JSON.stringify(obj);
         if (env.TRIALS_KV) {
-          if (ttlSeconds) await env.TRIALS_KV.put(`trial:${user}`, s, { expirationTtl: ttlSeconds });
+          if (ttlSeconds)
+            await env.TRIALS_KV.put(`trial:${user}`, s, {
+              expirationTtl: ttlSeconds
+            });
           else await env.TRIALS_KV.put(`trial:${user}`, s);
         } else {
-          if (ttlSeconds) await env.LICENSES_KV.put(`trial:${user}`, s, { expirationTtl: ttlSeconds });
+          if (ttlSeconds)
+            await env.LICENSES_KV.put(`trial:${user}`, s, {
+              expirationTtl: ttlSeconds
+            });
           else await env.LICENSES_KV.put(`trial:${user}`, s);
         }
       } catch {
       }
-    }, "trialPut");
-    const trialDelete = /* @__PURE__ */ __name2(async (user) => {
+    }
+    __name(trialPut, "trialPut");
+    async function trialDelete(user) {
       try {
         if (env.TRIALS_KV) await env.TRIALS_KV.delete(`trial:${user}`);
         else await env.LICENSES_KV.delete(`trial:${user}`);
       } catch {
       }
-    }, "trialDelete");
-    const logTamper = /* @__PURE__ */ __name2(async (user) => {
+    }
+    __name(trialDelete, "trialDelete");
+    async function logTamper(user) {
       try {
         if (env.RATE_KV) {
           await kvIncrement(env.RATE_KV, `tamper:${user}`, 24 * 3600);
@@ -232,18 +259,23 @@ var index_default = {
             let n = 0;
             if (cur !== null) n = parseInt(cur, 10) || 0;
             n++;
-            await env.TRIALS_KV.put(key, String(n), { expirationTtl: 24 * 3600 });
+            await env.TRIALS_KV.put(key, String(n), {
+              expirationTtl: 24 * 3600
+            });
           } else {
             const cur = await env.LICENSES_KV.get(key);
             let n = 0;
             if (cur !== null) n = parseInt(cur, 10) || 0;
             n++;
-            await env.LICENSES_KV.put(key, String(n), { expirationTtl: 24 * 3600 });
+            await env.LICENSES_KV.put(key, String(n), {
+              expirationTtl: 24 * 3600
+            });
           }
         }
       } catch {
       }
-    }, "logTamper");
+    }
+    __name(logTamper, "logTamper");
     async function listAll() {
       const out = [];
       let cursor;
@@ -253,7 +285,7 @@ var index_default = {
           const d = await getRec(k.name) || {};
           out.push({
             user: k.name,
-            key: d.key ?? "—",
+            key: d.key ?? "\u2014",
             revoked: !!d.revoked,
             reason: d.reason ?? "",
             hwid: d.hwid ?? "",
@@ -266,34 +298,267 @@ var index_default = {
       return out;
     }
     __name(listAll, "listAll");
-    __name2(listAll, "listAll");
-
-    // Helper: check admin cookie
-    function isAdminRequest(request) {
-      const cookie = (request.headers.get('cookie') || '');
-      return cookie.split(';').map(c => c.trim()).some(c => c === 'admin=1');
+    function parseCookies(request2) {
+      const header = request2.headers.get("cookie") || "";
+      const obj = {};
+      header.split(";").map((c) => c.trim()).filter(Boolean).forEach((c) => {
+        const idx = c.indexOf("=");
+        if (idx === -1) return;
+        const k = c.slice(0, idx).trim();
+        const v = c.slice(idx + 1).trim();
+        obj[k] = v;
+      });
+      return obj;
     }
-
-    // Helper: get client IP (Cloudflare or X-Forwarded-For)
-    function getClientIP(request) {
-      const cf = request.headers.get('cf-connecting-ip');
+    __name(parseCookies, "parseCookies");
+    function getClientIP(request2) {
+      const cf = request2.headers.get("CF-Connecting-IP");
       if (cf) return cf;
-      const xff = request.headers.get('x-forwarded-for');
-      if (xff) return xff.split(',')[0].trim();
-      return request.headers.get('remote_addr') || null;
+      const xff = request2.headers.get("X-Forwarded-For");
+      if (xff) return xff.split(",")[0].trim();
+      return null;
     }
-
-    // Helper: mask key for display
+    __name(getClientIP, "getClientIP");
     function maskKey(k) {
-      if (!k) return '—';
-      if (k.length <= 8) return k.replace(/.(?=.{2})/g, '*');
-      return k.substring(0, 4) + k.substring(4, k.length - 4).replace(/./g, '*') + k.substring(k.length - 4);
+      if (!k) return "\u2014";
+      if (k.length <= 8) return k.replace(/.(?=.{2})/g, "*");
+      return k.substring(0, 4) + k.substring(4, k.length - 4).replace(/./g, "*") + k.substring(k.length - 4);
     }
-
+    __name(maskKey, "maskKey");
+    async function isAdminRequest(request2, env2) {
+      if (!env2.ADMIN_SESSIONS_KV) return false;
+      const cookies = parseCookies(request2);
+      const token = cookies["admin_session"];
+      if (!token) return false;
+      try {
+        const val = await env2.ADMIN_SESSIONS_KV.get(`sess:${token}`);
+        return !!val;
+      } catch {
+        return false;
+      }
+    }
+    __name(isAdminRequest, "isAdminRequest");
+    async function requireAdmin(request2, env2) {
+      if (!await isAdminRequest(request2, env2)) {
+        return new Response("Forbidden", { status: 403 });
+      }
+      return null;
+    }
+    __name(requireAdmin, "requireAdmin");
+    async function createAdminSession(env2) {
+      if (!env2.ADMIN_SESSIONS_KV) {
+        throw new Error("ADMIN_SESSIONS_KV not bound");
+      }
+      const arr = new Uint8Array(32);
+      crypto.getRandomValues(arr);
+      let token = bytesToBase64(arr);
+      token = token.replace(/=+$/g, "").replace(/\+/g, "-").replace(/\//g, "_");
+      await env2.ADMIN_SESSIONS_KV.put(`sess:${token}`, "1", {
+        expirationTtl: 3600
+      });
+      return token;
+    }
+    __name(createAdminSession, "createAdminSession");
+    async function destroyAdminSession(request2, env2) {
+      if (!env2.ADMIN_SESSIONS_KV) return;
+      const cookies = parseCookies(request2);
+      const token = cookies["admin_session"];
+      if (!token) return;
+      try {
+        await env2.ADMIN_SESSIONS_KV.delete(`sess:${token}`);
+      } catch {
+      }
+    }
+    __name(destroyAdminSession, "destroyAdminSession");
+    const CLAILA = {
+      BASE: "https://app.claila.com/api/v2",
+      SESSION_ID: "1764868266",
+      // adjust if needed
+      COOKIES: "dmcfkjn3cdc=57t5c1snh9jceg0t59llkkoebc; theme=dark; auh=5e04b542",
+      REFERER: "https://app.claila.com/chat?uid=b7fe260b&lang=en",
+      UA: "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:145.0) Gecko/20100101 Firefox/145.0"
+    };
+    async function clailaGetCsrfToken() {
+      const res = await fetch(`${CLAILA.BASE}/getcsrftoken`, {
+        method: "GET",
+        headers: {
+          "User-Agent": CLAILA.UA,
+          Accept: "*/*",
+          "Accept-Language": "en-US",
+          "Accept-Encoding": "gzip, deflate, br, zstd",
+          "X-Requested-With": "XMLHttpRequest",
+          Referer: CLAILA.REFERER,
+          Cookie: CLAILA.COOKIES,
+          Pragma: "no-cache",
+          "Cache-Control": "no-cache",
+          "Sec-Fetch-Dest": "empty",
+          "Sec-Fetch-Mode": "cors",
+          "Sec-Fetch-Site": "same-origin"
+        }
+      });
+      const txt = await res.text().catch(() => "");
+      return (txt || "").trim();
+    }
+    __name(clailaGetCsrfToken, "clailaGetCsrfToken");
+    async function clailaPostForm(path, paramsObj, extraHeaders = {}) {
+      const token = await clailaGetCsrfToken();
+      const body = new URLSearchParams();
+      for (const k of Object.keys(paramsObj)) {
+        body.append(k, paramsObj[k]);
+      }
+      const headers = {
+        "User-Agent": CLAILA.UA,
+        Accept: "*/*",
+        "Accept-Language": "en-US",
+        "Accept-Encoding": "gzip, deflate, br, zstd",
+        "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+        "X-CSRF-Token": token || "",
+        "X-Requested-With": "XMLHttpRequest",
+        Origin: "https://app.claila.com",
+        Referer: CLAILA.REFERER,
+        Cookie: CLAILA.COOKIES,
+        Connection: "keep-alive",
+        Pragma: "no-cache",
+        "Cache-Control": "no-cache",
+        "Sec-Fetch-Dest": "empty",
+        "Sec-Fetch-Mode": "cors",
+        "Sec-Fetch-Site": "same-origin",
+        ...extraHeaders
+      };
+      const res = await fetch(`${CLAILA.BASE}/${path}`, {
+        method: "POST",
+        headers,
+        body
+      });
+      const text = await res.text().catch(() => "");
+      return { ok: res.ok, status: res.status, headers: res.headers, text };
+    }
+    __name(clailaPostForm, "clailaPostForm");
+    async function clailaChatText(userMessage) {
+      const params = {
+        model: "gpt-5-mini",
+        calltype: "completion",
+        message: userMessage,
+        sessionId: CLAILA.SESSION_ID,
+        chat_mode: "chat",
+        websearch: "false",
+        tmp_enabled: "1"
+      };
+      const { ok, status, text } = await clailaPostForm("unichat4", params);
+      if (!ok) throw new Error(`Claila text chat failed: HTTP ${status}`);
+      return text || "(no text)";
+    }
+    __name(clailaChatText, "clailaChatText");
+    async function clailaUploadImageFromBase64(b64, filename = "image.jpg", mime = "image/jpeg") {
+      const buf = base64ToBytes(b64);
+      if (!buf) throw new Error("Invalid base64 image");
+      const blob = new Blob([buf], { type: mime });
+      const form = new FormData();
+      form.append("file", blob, filename);
+      const headers = {
+        "User-Agent": CLAILA.UA,
+        Accept: "application/json",
+        "Accept-Language": "en-US",
+        "Accept-Encoding": "gzip, deflate, br, zstd",
+        "Cache-Control": "no-cache",
+        "X-Requested-With": "XMLHttpRequest",
+        Origin: "https://app.claila.com",
+        Referer: CLAILA.REFERER,
+        Cookie: CLAILA.COOKIES,
+        Connection: "keep-alive",
+        "Sec-Fetch-Dest": "empty",
+        "Sec-Fetch-Mode": "cors",
+        "Sec-Fetch-Site": "same-origin"
+      };
+      const res = await fetch(
+        `${CLAILA.BASE}/fileupload/${CLAILA.SESSION_ID}`,
+        {
+          method: "POST",
+          headers,
+          body: form
+        }
+      );
+      const txt = await res.text().catch(() => "");
+      let parsed;
+      try {
+        parsed = JSON.parse(txt);
+      } catch {
+        parsed = null;
+      }
+      if (!res.ok) {
+        throw new Error(`Claila fileupload failed: HTTP ${res.status} - ${txt}`);
+      }
+      const fileId = parsed && (parsed.file || parsed.fileId || parsed.id || null);
+      if (!fileId)
+        throw new Error(
+          "Claila fileupload succeeded but no file id in response"
+        );
+      return { fileId, raw: parsed ?? txt };
+    }
+    __name(clailaUploadImageFromBase64, "clailaUploadImageFromBase64");
+    async function clailaVisionFromFileId(fileId, prompt = "Explain this image") {
+      const params = {
+        message: prompt,
+        sessionId: CLAILA.SESSION_ID,
+        action: "image-vision",
+        file: fileId,
+        chat_mode: "images",
+        websearch: "false",
+        tmp_enabled: "0"
+      };
+      const { ok, status, text } = await clailaPostForm("setchatbot2", params);
+      if (!ok) throw new Error(`Claila vision failed: HTTP ${status}`);
+      try {
+        const parsed = JSON.parse(text);
+        if (typeof parsed === "string") return parsed;
+        if (parsed.reply) return parsed.reply;
+        if (parsed.message) return parsed.message;
+        if (parsed.updated_prompt) return parsed.updated_prompt;
+        return text;
+      } catch {
+        return text || "(no text)";
+      }
+    }
+    __name(clailaVisionFromFileId, "clailaVisionFromFileId");
+    async function clailaFallbackChat(userMessage, reason, imageFileId = null) {
+      try {
+        if (imageFileId) {
+          const reply = await clailaVisionFromFileId(
+            imageFileId,
+            userMessage || "Explain this image"
+          );
+          return {
+            provider: "claila",
+            model: "gpt-4.1-mini",
+            reply: reply || "(no text)",
+            raw: reply,
+            reason
+          };
+        } else {
+          const reply = await clailaChatText(userMessage);
+          return {
+            provider: "claila",
+            model: "gpt-5-mini",
+            reply: reply || "(no text)",
+            raw: reply,
+            reason
+          };
+        }
+      } catch (e) {
+        return {
+          error: {
+            message: "Claila fallback failed",
+            error: String(e)
+          },
+          reason
+        };
+      }
+    }
+    __name(clailaFallbackChat, "clailaFallbackChat");
     try {
-      if (url.pathname === "/favicon.ico") return new Response("", { status: 204 });
-
-      // Login page (GET)
+      if (url.pathname === "/favicon.ico") {
+        return new Response("", { status: 204 });
+      }
       if (url.pathname === "/login" && request.method === "GET") {
         const html = `<!doctype html>
 <html>
@@ -308,55 +573,69 @@ var index_default = {
     <p style="color:#97a0b3">Note: set the password in your Worker environment variable GUI_PASSWORD.</p>
   </body>
 </html>`;
-        return new Response(html, { headers: { 'Content-Type': 'text/html' } });
+        return new Response(html, { headers: { "Content-Type": "text/html" } });
       }
-
-      // Login submit (POST)
       if (url.pathname === "/login" && request.method === "POST") {
-        const f = await request.formData();
-        const pass = f.get('password') || '';
-        const configured = env.GUI_PASSWORD || '';
+        const clientIP = getClientIP(request);
+        const form = await request.formData();
+        const pass = form.get("password") || "";
+        const configured = env.GUI_PASSWORD || "";
         if (!configured) {
-          return new Response('Admin password not configured in environment (GUI_PASSWORD).', { status: 500 });
+          return new Response(
+            "Admin password not configured in environment (GUI_PASSWORD).",
+            { status: 500 }
+          );
         }
-        // simple equality check; env GUI_PASSWORD should be set
         if (pass === configured) {
-          // set admin cookie for 1 hour
+          let sessionToken;
+          try {
+            sessionToken = await createAdminSession(env);
+          } catch (e) {
+            return new Response(
+              "Failed to create admin session: " + String(e),
+              { status: 500 }
+            );
+          }
           return new Response(null, {
             status: 302,
             headers: {
-              'Location': '/guiaddinfo',
-              'Set-Cookie': 'admin=1; Path=/; Max-Age=3600; HttpOnly; Secure; SameSite=Strict'
+              Location: "/guiaddinfo",
+              "Set-Cookie": `admin_session=${sessionToken}; Path=/; Max-Age=3600; HttpOnly; Secure; SameSite=Strict`
             }
           });
         }
-        return new Response('Invalid password', { status: 403 });
+        return new Response("Invalid password", { status: 403 });
       }
-
+      if (url.pathname === "/logout" && request.method === "POST") {
+        await destroyAdminSession(request, env);
+        return new Response(null, {
+          status: 302,
+          headers: {
+            Location: "/login",
+            "Set-Cookie": "admin_session=deleted; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Strict"
+          }
+        });
+      }
       if (url.pathname === "/" && request.method === "GET") {
         return absRedirect("/guiaddinfo");
       }
-
-      // GUI: list + add. Password protected (requires admin cookie set by /login)
       if (url.pathname === "/guiaddinfo" && request.method === "GET") {
-        // Restrict to a single allowed IP
         const clientIP = getClientIP(request);
-        if (clientIP !== '80.233.252.90') return new Response('Forbidden', { status: 403 });
-
-        if (!isAdminRequest(request)) return absRedirect('/login');
-
+        if (clientIP && clientIP !== "80.233.252.90") {
+          return new Response("Forbidden", { status: 403 });
+        }
         const users = await listAll();
-        const rows = users.length === 0 ? "<i>Vēl nav licenču.</i>" : users.map((u) => {
+        const rows = users.length === 0 ? "<i>V\u0113l nav licen\u010Du.</i>" : users.map((u) => {
           const uname = escapeHTML(u.user);
           const key = escapeHTML(u.key);
           const reason = escapeHTML(u.reason);
-          const hwid = escapeHTML(u.hwid || "—");
+          const hwid = escapeHTML(u.hwid || "\u2014");
           const tier = escapeHTML(u.tier || "Basic");
           const expText = u.expires ? (() => {
             const d = new Date(u.expires * 1e3);
             const iso = d.toISOString().replace("T", " ");
             return iso.substring(0, 16);
-          })() : "Bez termiņa";
+          })() : "Bez termi\u0146a";
           const expEsc = escapeHTML(expText);
           return `
 <li class="row">
@@ -365,14 +644,13 @@ var index_default = {
     <div class="meta">
       ${key}
       ${u.revoked ? `<span class="revoked">[ATCELTA: ${reason}]</span>` : ""}
-      <span class="expiry">[Derīga līdz: ${expEsc}]</span>
+      <span class="expiry">[Der\u012Bga l\u012Bdz: ${expEsc}]</span>
       <span class="expiry">[Tier: ${tier}]</span>
     </div>
   </div>
   <div class="right">
     <div class="hwid">(HWID: ${hwid})</div>
 
-    <!-- Tier form: posts to /wtier using username as key -->
     <form method="POST" action="/wtier" class="inline" onsubmit="return confirmAction('Set tier for: ${uname}?')">
       <input type="hidden" name="key" value="${uname}">
       <select name="tier" aria-label="Tier for ${uname}">
@@ -396,7 +674,7 @@ var index_default = {
     <form method="POST" action="/setexpire" class="inline" onsubmit="return confirmAction('Main\u012Bt termi\u0146u: ${uname}?')">
       <input type="hidden" name="username" value="${uname}">
       <input name="days" placeholder="Dienas (0 = lifetime)" style="width:110px">
-      <button class="btn">Termiņš</button>
+      <button class="btn">Termi\u0146\u0161</button>
     </form>
     <form method="POST" action="/delete" class="inline" onsubmit="return confirmAction('Dz\u0113st licenci: ${uname}? Tas nevar tikt atsaukts!')">
       <input type="hidden" name="username" value="${uname}">
@@ -405,24 +683,21 @@ var index_default = {
   </div>
 </li>`;
         }).join("");
-
-        // Read stored OpenAI key (env first, then CONFIG_KV)
         let storedOpenAI = env.OPENAI_API_KEY || null;
         try {
           if (!storedOpenAI && env.CONFIG_KV) {
-            const maybe = await env.CONFIG_KV.get('OPENAI_API_KEY');
+            const maybe = await env.CONFIG_KV.get("OPENAI_API_KEY");
             if (maybe) storedOpenAI = maybe;
           }
         } catch (e) {
         }
         const maskedKey = maskKey(storedOpenAI);
-
         const html = `<!doctype html>
 <html lang="lv">
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Licences pārvaldnieks</title>
+  <title>Licences p\u0101rvaldnieks</title>
   <style>
     :root{
       --bg:#0b0f14;
@@ -448,16 +723,8 @@ var index_default = {
       -webkit-font-smoothing:antialiased;
       -moz-osx-font-smoothing:grayscale;
     }
-    .container{
-      max-width:1000px;
-      margin:0 auto;
-    }
-    header{
-      display:flex;
-      align-items:center;
-      gap:12px;
-      margin-bottom:20px;
-    }
+    .container{max-width:1000px;margin:0 auto;}
+    header{display:flex;align-items:center;gap:12px;margin-bottom:20px;}
     h1{margin:0;font-size:20px}
     p.lead{margin:0;color:var(--muted);font-size:13px}
     .card{
@@ -468,12 +735,7 @@ var index_default = {
       border:1px solid rgba(255,255,255,0.03);
       margin-bottom:18px;
     }
-    form.grid{
-      display:grid;
-      grid-template-columns:150px 1fr;
-      gap:10px;
-      align-items:center;
-    }
+    form.grid{display:grid;grid-template-columns:150px 1fr;gap:10px;align-items:center;}
     label{color:var(--muted);font-size:13px}
     input[type="text"], input[type="search"], input[name="key"], input[name="username"], input[name="reason"], input[name="days"], input[name="custom_days"]{
       background:var(--glass);
@@ -482,7 +744,7 @@ var index_default = {
       border-radius:8px;
       color:var(--text);
       width:100%;
-      outline: none;
+      outline:none;
     }
     select{
       background:var(--glass);
@@ -513,10 +775,10 @@ var index_default = {
     .name{font-weight:700}
     .meta{color:var(--muted);font-size:13px;margin-top:4px}
     .revoked{color:var(--danger);font-weight:700;margin-left:8px}
-    .expiry{margin-left:8px;color:var(--muted);}n    .right{display:flex;align-items:center;gap:8px}
+    .expiry{margin-left:8px;color:var(--muted);}
+    .right{display:flex;align-items:center;gap:8px}
     .inline{display:inline-flex;gap:8px;align-items:center;margin:0}
     .hwid{color:var(--muted);font-size:13px;margin-right:6px}
-    .danger{border-color:rgba(255,97,97,0.14);color:var(--danger)}
     .big-danger{background:linear-gradient(180deg, rgba(255,97,97,0.12), rgba(255,97,97,0.05));color:#fff;border:none;padding:10px 14px;border-radius:10px}
     footer{color:var(--muted);font-size:12px;margin-top:8px}
     @media (max-width:720px){
@@ -529,23 +791,23 @@ var index_default = {
   <div class="container">
     <header>
       <div>
-        <h1>Licences pārvaldnieks (Admin)</h1>
+        <h1>Licences p\u0101rvaldnieks (Admin)</h1>
         <p class="lead"></p>
       </div>
     </header>
 
     <div class="card">
       <form method="POST" action="/guiaddinfo" class="grid" onsubmit="return validateAdd()">
-        <label>Lietotājvārds</label>
+        <label>Lietot\u0101jv\u0101rds</label>
         <input name="username" id="username" required>
 
-        <label>Licences atslēga</label>
+        <label>Licences atsl\u0113ga</label>
         <div class="generate">
           <input name="key" id="key" required>
-          <button type="button" onclick="document.getElementById('key').value = gen()">Ģenerēt</button>
+          <button type="button" onclick="document.getElementById('key').value = gen()">\u0122ener\u0113t</button>
         </div>
 
-        <label>Derīguma termiņš</label>
+        <label>Der\u012Bguma termi\u0146\u0161</label>
         <div class="generate">
           <select name="duration" id="duration">
             <option value="1d">1 diena</option>
@@ -565,13 +827,15 @@ var index_default = {
     </div>
 
     <div class="card">
-      <h3>Esošās licences</h3>
+      <h3>Eso\u0161\u0101s licences</h3>
       <ul id="list">${rows}</ul>
     </div>
 
     <div class="card">
       <h3>OpenAI API key</h3>
-      <p style="color:#97a0b3">Currently: <strong>${escapeHTML(maskedKey)}</strong></p>
+      <p style="color:#97a0b3">Currently: <strong>${escapeHTML(
+          maskedKey
+        )}</strong></p>
       <form method="POST" action="/set_openai_key" onsubmit="return confirm('Store/replace OpenAI API key?')">
         <input name="openai_key" placeholder="sk-... (enter to set/replace)" style="width:320px;padding:8px">
         <button type="submit" style="margin-left:8px">Save</button>
@@ -579,8 +843,8 @@ var index_default = {
     </div>
 
     <div class="card">
-      <form method="POST" action="/deleteall" onsubmit="return confirmAction('Dzēst VISAS licences? Tas nevar tikt atsaukts!')">
-        <button class="big-danger">Dzēst visas licences</button>
+      <form method="POST" action="/deleteall" onsubmit="return confirmAction('Dz\u0113st VISAS licences? Tas nevar tikt atsaukts!')">
+        <button class="big-danger">Dz\u0113st visas licences</button>
       </form>
     </div>
 
@@ -594,15 +858,12 @@ var index_default = {
       return Array(6).fill(0).map(p).join("-");
     }
 
-    function confirmAction(msg){
-      return confirm(msg);
-    }
-
+    function confirmAction(msg){return confirm(msg);}
     function validateAdd(){
       const u = document.getElementById('username').value.trim();
       const k = document.getElementById('key').value.trim();
       if(!u || !k){
-        alert('Lūdzu ievadiet lietotājvārdu un licences atslēgu.');
+        alert('L\u016Bdzu ievadiet lietot\u0101jv\u0101rdu un licences atsl\u0113gu.');
         return false;
       }
       return true;
@@ -612,13 +873,12 @@ var index_default = {
 </html>`;
         return new Response(html, { headers: { "Content-Type": "text/html" } });
       }
-
-      // GUI add info (POST) - admin only
       if (url.pathname === "/guiaddinfo" && request.method === "POST") {
-        // Restrict to a single allowed IP
         const clientIP = getClientIP(request);
-        if (clientIP !== '80.233.252.90') return new Response('Forbidden', { status: 403 });
-        if (!isAdminRequest(request)) return absRedirect('/login');
+        if (clientIP !== "80.233.252.90")
+          return new Response("Forbidden", { status: 403 });
+        const err = await requireAdmin(request, env);
+        if (err) return err;
         const f = await request.formData();
         const u = f.get("username");
         const k = f.get("key");
@@ -653,29 +913,34 @@ var index_default = {
         }
         return absRedirect("/guiaddinfo");
       }
-
-      // Endpoint to set OpenAI key from GUI (admin only)
       if (url.pathname === "/set_openai_key" && request.method === "POST") {
-        if (!isAdminRequest(request)) return absRedirect('/login');
+        const err = await requireAdmin(request, env);
+        if (err) return err;
         const f = await request.formData();
-        const key = f.get('openai_key');
+        const key = f.get("openai_key");
         if (!env.CONFIG_KV) {
-          return new Response('CONFIG_KV binding missing. Cannot store OpenAI key.', { status: 500 });
+          return new Response(
+            "CONFIG_KV binding missing. Cannot store OpenAI key.",
+            { status: 500 }
+          );
         }
         try {
           if (!key) {
-            // delete existing
-            await env.CONFIG_KV.delete('OPENAI_API_KEY');
+            await env.CONFIG_KV.delete("OPENAI_API_KEY");
           } else {
-            await env.CONFIG_KV.put('OPENAI_API_KEY', key);
+            await env.CONFIG_KV.put("OPENAI_API_KEY", key);
           }
         } catch (e) {
-          return new Response('Failed to persist OpenAI key: ' + String(e), { status: 500 });
+          return new Response(
+            "Failed to persist OpenAI key: " + String(e),
+            { status: 500 }
+          );
         }
-        return absRedirect('/guiaddinfo');
+        return absRedirect("/guiaddinfo");
       }
-
       if (url.pathname === "/setexpire" && request.method === "POST") {
+        const err = await requireAdmin(request, env);
+        if (err) return err;
         const f = await request.formData();
         const u = f.get("username");
         const daysStr = f.get("days");
@@ -683,28 +948,30 @@ var index_default = {
           const d = await getRec(u) || {};
           let days = parseInt(daysStr || "0", 10);
           if (!Number.isFinite(days)) days = 0;
-          if (days <= 0) {
-            d.expires = null;
-          } else {
+          if (days <= 0) d.expires = null;
+          else
             d.expires = Math.floor(Date.now() / 1e3) + days * 24 * 3600;
-          }
           await env.LICENSES_KV.put(u, JSON.stringify(d));
         }
         return absRedirect("/guiaddinfo");
       }
       if (url.pathname === "/revoke" && request.method === "POST") {
+        const err = await requireAdmin(request, env);
+        if (err) return err;
         const f = await request.formData();
         const u = f.get("username");
         const r = f.get("reason");
         if (u) {
           const d = await getRec(u) || {};
           d.revoked = true;
-          d.reason = r || "Nav norādīts iemesls";
+          d.reason = r || "Nav nor\u0101d\u012Bts iemesls";
           await env.LICENSES_KV.put(u, JSON.stringify(d));
         }
         return absRedirect("/guiaddinfo");
       }
       if (url.pathname === "/unrevoke" && request.method === "POST") {
+        const err = await requireAdmin(request, env);
+        if (err) return err;
         const f = await request.formData();
         const u = f.get("username");
         if (u) {
@@ -716,6 +983,8 @@ var index_default = {
         return absRedirect("/guiaddinfo");
       }
       if (url.pathname === "/delete" && request.method === "POST") {
+        const err = await requireAdmin(request, env);
+        if (err) return err;
         const f = await request.formData();
         const u = f.get("username");
         if (u) {
@@ -723,16 +992,15 @@ var index_default = {
             const exists = await env.LICENSES_KV.get(u);
             if (exists !== null) {
               await env.LICENSES_KV.delete(u);
-            } else {
-              console.warn(`Delete requested for missing user: ${u}`);
             }
           } catch (e) {
-            console.error("Error deleting user", u, e);
           }
         }
         return absRedirect("/guiaddinfo");
       }
       if (url.pathname === "/deleteall" && request.method === "POST") {
+        const err = await requireAdmin(request, env);
+        if (err) return err;
         let cursor;
         try {
           do {
@@ -741,36 +1009,62 @@ var index_default = {
               try {
                 await env.LICENSES_KV.delete(k.name);
               } catch (e) {
-                console.error("Failed to delete", k.name, e);
               }
             }
             cursor = page.cursor;
           } while (cursor);
         } catch (e) {
-          console.error("Failed deleteall loop", e);
         }
         return absRedirect("/guiaddinfo");
       }
-
       if (request.method === "GET" && url.pathname === "/challenge") {
         const user = url.searchParams.get("user") || url.searchParams.get("username");
         const key = url.searchParams.get("key");
-        if (!user || !key) return json({ error: "Trūkst lietotājvārda vai atslēgas" }, { status: 400 });
+        if (!user || !key)
+          return json(
+            { error: "Tr\u016Bkst lietot\u0101jv\u0101rda vai atsl\u0113gas" },
+            { status: 400 }
+          );
         const d = await getRec(user);
-        if (!d) return obfJson({ valid: false, message: "Nepazīstams lietotājs" }, { status: 404 });
-        if (d.key !== key) return obfJson({ valid: false, message: "Nederīga licences atslēga" }, { status: 403 });
-        if (d.revoked) return obfJson({ valid: false, revoked: true, reason: d.reason, message: `Licence atcelta: ${d.reason}` }, { status: 403 });
-        if (d.expires && Date.now() / 1e3 > d.expires) return obfJson({ valid: false, expired: true, message: "Licence beigusies." }, { status: 403 });
+        if (!d)
+          return obfJson(
+            { valid: false, message: "Nepaz\u012Bstams lietot\u0101js" },
+            { status: 404 }
+          );
+        if (d.key !== key)
+          return obfJson(
+            { valid: false, message: "Neder\u012Bga licences atsl\u0113ga" },
+            { status: 403 }
+          );
+        if (d.revoked)
+          return obfJson(
+            {
+              valid: false,
+              revoked: true,
+              reason: d.reason,
+              message: `Licence atcelta: ${d.reason}`
+            },
+            { status: 403 }
+          );
+        if (d.expires && Date.now() / 1e3 > d.expires)
+          return obfJson(
+            { valid: false, expired: true, message: "Licence beigusies." },
+            { status: 403 }
+          );
         const nonce = genRandomBase64(32);
         await storeNonce(nonce, user, 300);
         return obfJson({ nonce });
       }
-
       if (url.pathname === "/trial" && request.method === "GET") {
         const user = url.searchParams.get("user") || url.searchParams.get("username");
-        if (!user) return obfJson({ error: "missing_user" }, { status: 400 });
+        if (!user)
+          return obfJson({ error: "missing_user" }, { status: 400 });
         const rec = await getRec(user);
-        if (!rec) return obfJson({ valid: false, message: "unknown_user" }, { status: 404 });
+        if (!rec)
+          return obfJson(
+            { valid: false, message: "unknown_user" },
+            { status: 404 }
+          );
         const now = Math.floor(Date.now() / 1e3);
         let trial = await trialGet(user);
         if (!trial) {
@@ -783,19 +1077,24 @@ var index_default = {
         }
         const remaining = trial.expires - now;
         if (remaining <= 0) {
-          return obfJson({
-            valid: false,
-            trial: "expired",
-            message: "Your free trial has ended."
-          }, { status: 200 });
+          return obfJson(
+            {
+              valid: false,
+              trial: "expired",
+              message: "Your free trial has ended."
+            },
+            { status: 200 }
+          );
         }
-        return obfJson({
-          valid: true,
-          trial: "active",
-          remaining_seconds: remaining
-        }, { status: 200 });
+        return obfJson(
+          {
+            valid: true,
+            trial: "active",
+            remaining_seconds: remaining
+          },
+          { status: 200 }
+        );
       }
-
       if (url.pathname === "/trial" && request.method === "POST") {
         let body = {};
         try {
@@ -803,52 +1102,79 @@ var index_default = {
         } catch (_) {
         }
         const user = body.user || body.username;
-        if (!user) return obfJson({ error: "missing_user" }, { status: 400 });
+        if (!user)
+          return obfJson({ error: "missing_user" }, { status: 400 });
         const rec = await getRec(user);
-        if (!rec) return obfJson({ valid: false, message: "unknown_user" }, { status: 404 });
+        if (!rec)
+          return obfJson(
+            { valid: false, message: "unknown_user" },
+            { status: 404 }
+          );
         const now = Math.floor(Date.now() / 1e3);
         let trial = await trialGet(user);
         if (!trial) {
-          return obfJson({
-            warning: "Trial_Not_Started",
-            message: "Trial not started. Use GET /trial to initialize your free trial."
-          }, { status: 400 });
+          return obfJson(
+            {
+              warning: "Trial_Not_Started",
+              message: "Trial not started. Use GET /trial to initialize your free trial."
+            },
+            { status: 400 }
+          );
         }
         const remaining = trial.expires - now;
         if (remaining <= 0) {
           await logTamper(user);
-          return obfJson({
-            alert: true,
-            message: "Suspicious attempt to reset/extend an expired trial detected. This action is denied and logged."
-          }, { status: 403 });
+          return obfJson(
+            {
+              alert: true,
+              message: "Suspicious attempt to reset/extend an expired trial detected. This action is denied and logged."
+            },
+            { status: 403 }
+          );
         }
         if (body.requested_minutes) {
-          const requestedSeconds = parseInt(body.requested_minutes, 10) * 60;
+          const requestedSeconds = parseInt(
+            body.requested_minutes,
+            10
+          ) * 60;
           if (!Number.isFinite(requestedSeconds)) {
-            return obfJson({ error: "invalid_requested_minutes" }, { status: 400 });
+            return obfJson(
+              { error: "invalid_requested_minutes" },
+              { status: 400 }
+            );
           }
           const requestedExpiry = now + requestedSeconds;
           if (requestedExpiry > trial.expires) {
             await logTamper(user);
-            return obfJson({
-              alert: true,
-              message: "Suspicious attempt to extend the trial detected. Extension denied and logged."
-            }, { status: 403 });
+            return obfJson(
+              {
+                alert: true,
+                message: "Suspicious attempt to extend the trial detected. Extension denied and logged."
+              },
+              { status: 403 }
+            );
           }
-          return obfJson({
-            ok: false,
-            message: "Manual trial modification is not allowed."
-          }, { status: 403 });
+          return obfJson(
+            {
+              ok: false,
+              message: "Manual trial modification is not allowed."
+            },
+            { status: 403 }
+          );
         }
-        return obfJson({
-          valid: true,
-          trial: remaining > 0 ? "active" : "expired",
-          remaining_seconds: remaining > 0 ? remaining : 0,
-          message: "No modification performed."
-        }, { status: 200 });
+        return obfJson(
+          {
+            valid: true,
+            trial: remaining > 0 ? "active" : "expired",
+            remaining_seconds: remaining > 0 ? remaining : 0,
+            message: "No modification performed."
+          },
+          { status: 200 }
+        );
       }
-
       if (url.pathname === "/wtier" && request.method === "POST") {
+        const err = await requireAdmin(request, env);
+        if (err) return err;
         let body = {};
         const ct = (request.headers.get("content-type") || "").toLowerCase();
         if (ct.includes("application/json")) {
@@ -869,188 +1195,162 @@ var index_default = {
         const maybeKeyOrUser = body.key;
         const tier = body.tier;
         if (!maybeKeyOrUser || !tier) {
-          return obfJson({ success: false, message: "Missing required fields: key, tier" }, { status: 400 });
+          return obfJson(
+            { success: false, message: "Missing required fields: key, tier" },
+            { status: 400 }
+          );
         }
         if (!ALLOWED_TIERS.includes(tier)) {
-          return obfJson({
-            success: false,
-            message: "Invalid tier. Allowed: Basic, Basic+, Pro, Premium"
-          }, { status: 400 });
+          return obfJson(
+            {
+              success: false,
+              message: "Invalid tier. Allowed: Basic, Basic+, Pro, Premium"
+            },
+            { status: 400 }
+          );
         }
         const found = await findLicenseByKeyOrUser(maybeKeyOrUser);
         if (!found) {
-          return obfJson({ success: false, message: "Unknown license key or username." }, { status: 404 });
+          return obfJson(
+            { success: false, message: "Unknown license key or username." },
+            { status: 404 }
+          );
         }
         const { username, record } = found;
         record.tier = tier;
         try {
           await env.LICENSES_KV.put(username, JSON.stringify(record));
         } catch (e) {
-          return obfJson({ success: false, message: "Failed to persist tier update." }, { status: 500 });
+          return obfJson(
+            { success: false, message: "Failed to persist tier update." },
+            { status: 500 }
+          );
         }
-        return obfJson({
-          success: true,
-          username,
-          key: record.key ?? null,
-          tier,
-          message: "Tier updated successfully."
-        }, { status: 200 });
+        return obfJson(
+          {
+            success: true,
+            username,
+            key: record.key ?? null,
+            tier,
+            message: "Tier updated successfully."
+          },
+          { status: 200 }
+        );
       }
-
       if (url.pathname === "/tier" && request.method === "GET") {
         const maybeKeyOrUser = url.searchParams.get("key") || url.searchParams.get("license") || url.searchParams.get("user") || url.searchParams.get("username");
         if (!maybeKeyOrUser) {
-          return obfJson({ success: false, message: "Missing required fields: key or user" }, { status: 400 });
+          return obfJson(
+            { success: false, message: "Missing required fields: key or user" },
+            { status: 400 }
+          );
         }
         const found = await findLicenseByKeyOrUser(maybeKeyOrUser);
         if (!found) {
-          return obfJson({ success: false, message: "Unknown license key or username." }, { status: 404 });
+          return obfJson(
+            { success: false, message: "Unknown license key or username." },
+            { status: 404 }
+          );
         }
         const { username, record } = found;
-        return obfJson({ success: true, username, tier: record.tier || "Basic" }, { status: 200 });
+        return obfJson(
+          { success: true, username, tier: record.tier || "Basic" },
+          { status: 200 }
+        );
       }
-
       if (url.pathname === "/msg" && request.method === "POST") {
         let body = {};
         try {
           body = await request.json();
         } catch (e) {
-          return obfJson({ success: false, message: "Invalid JSON body" }, { status: 400 });
+          return obfJson(
+            { success: false, message: "Invalid JSON body" },
+            { status: 400 }
+          );
         }
-        const maybeKeyOrUser = typeof body.key === "string" ? body.key.trim() : null;
-        const rawMessage = typeof body.message === "string" ? body.message.trim() : null;
-        if (!maybeKeyOrUser || !rawMessage) {
-          return obfJson({ success: false, message: "Missing required fields: key, message" }, { status: 400 });
+        const maybeKeyOrUser = body.key;
+        const message = body.message;
+        const imageBase64 = body.image_base64 || body.image_b64 || null;
+        const imageFileIdFromClient = body.fileId || body.file_id || null;
+        if (!maybeKeyOrUser || !message) {
+          return obfJson(
+            { success: false, message: "Missing required fields: key, message" },
+            { status: 400 }
+          );
         }
-        if (rawMessage.length > 6000) {
-          return obfJson({ success: false, message: "Message too long" }, { status: 413 });
-        }
-
-        const clientIp = request.headers.get("CF-Connecting-IP") || request.headers.get("x-forwarded-for") || "unknown";
-        if (env.NONCES_KV) {
-          const rateKey = `msg-rate:${maybeKeyOrUser}:${clientIp}`;
-          const attempts = await kvIncrement(env.NONCES_KV, rateKey, 60);
-          if (attempts > 20) {
-            return obfJson({ success: false, message: "Rate limit exceeded" }, { status: 429 });
-          }
-        }
-
         const found = await findLicenseByKeyOrUser(maybeKeyOrUser);
         if (!found) {
-          return obfJson({ success: false, message: "Unknown license key or username." }, { status: 404 });
+          return obfJson(
+            { success: false, message: "Unknown license key or username." },
+            { status: 404 }
+          );
         }
         const { username, record: lic } = found;
         if (lic.revoked) {
-          return obfJson({ success: false, message: `License revoked: ${lic.reason || "No reason"}` }, { status: 403 });
+          return obfJson(
+            {
+              success: false,
+              message: `License revoked: ${lic.reason || "No reason"}`
+            },
+            { status: 403 }
+          );
         }
         const now = Math.floor(Date.now() / 1e3);
         if (lic.expires && now > lic.expires) {
-          return obfJson({ success: false, message: "License expired" }, { status: 403 });
+          return obfJson(
+            { success: false, message: "License expired" },
+            { status: 403 }
+          );
         }
         const tier = lic.tier || "Basic";
         const model = tier === "Basic+" ? "gpt-4o-mini" : tier === "Pro" ? "gpt-5-nano" : tier === "Premium" ? "gpt-5.1-nano" : null;
-        const message = rawMessage;
         let openaiError = null;
-
-        async function callFallbackChat(userMessage, reason) {
-          const payload = {
-            messages: [
-              {
-                role: "system",
-                content: "You are ChatGPT 5, an advanced AI assistant. Be helpful and concise. IMPORTANT: If a user asks for an image, picture, logo, design, or visual in ANY language, provide a detailed description or prompt for the image. Never say you cannot generate images. The platform handles image generation automatically when users request visuals.",
-              },
-              { role: "user", content: "67" },
-              {
-                role: "assistant",
-                content: "It seems like you entered \"67.\" Could you please provide more context or specify what you would like to know or discuss about it?",
-              },
-              { role: "user", content: "whats this file? What programming language?" },
-              {
-                role: "assistant",
-                content: "The file you've provided is a Python script named `ehrvote.py`. It is designed to exploit a buffer overflow vulnerability in the SHOUTcast DNAS (Distributed Network Audio Server) version 1.9.8, specifically targeting the `admin.cgi` endpoint. Here are the key details about the script:\n\n### Key Information:\n\n- **Programming Language**: Python\n- **Purpose**: The script is intended for educational purposes and testing. It demonstrates how to craft a request that potentially causes a buffer overflow by sending a long string of backslashes as a parameter (`pass`) in a GET request.\n- **Target**: The script targets a specific SHOUTcast server URL (which appears to be down as noted in the comments).\n- **Dependencies**: It requires the `requests` library, which is used to handle HTTP requests in Python.\n\n### Functionality:\n\n1. **Crafting Payload**: The script creates a payload that consists of 10,000 backslashes, which is meant to overflow the buffer in the application when processed.\n2. **Sending Request**: It sends a GET request to the `admin.cgi` endpoint with the crafted parameters.\n3. **Handling Response**: It prints out the server's HTTP status code, headers, and part of the response body. If a crash occurs, it may receive an empty response.\n4. **Error Handling**: It includes error handling for potential request issues.\n\n### Warning:\nThe script includes a clear warning that it should not be used on unauthorized systems and is intended solely for educational and testing scenarios. Always ensure ethical practices when dealing with security vulnerabilities.",
-              },
-              { role: "user", content: "Describe this photo" },
-              {
-                role: "assistant",
-                content: "The provided text appears to be a corrupted or unreadable version of a JPEG image file, indicating that it contains binary data rather than human-readable content. However, I can help you visualize a photo based on a general description of a typical premium photo.\n\n### Description of a Premium Photo:\nImagine a vibrant landscape featuring a stunning sunset over a serene lake. The sky is painted with hues of orange, pink, and purple, reflecting beautifully on the calm water surface. In the foreground, lush green trees frame the scene, and a silhouette of distant mountains adds depth to the horizon. The overall atmosphere is tranquil, evoking feelings of peace and natural beauty.\n\nIf you have a specific image in mind or need a different type of description, please let me know!",
-              },
-              { role: "user", content: "Hi" },
-              { role: "assistant", content: "Hello! How can I assist you today?" },
-              { role: "user", content: `Task and prompt to solve:\n${userMessage}` },
-            ],
-            provider: "openai",
-          };
-
-          let parsed = null;
-          let rawText = null;
+        let result = null;
+        let clailaImageFileId = imageFileIdFromClient;
+        if (!clailaImageFileId && imageBase64) {
           try {
-            const r = await fetch("https://chatgpt5free.com/wp-json/chatgpt-pro/v1/chat", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(payload),
-            });
-            rawText = await r.text();
-            try {
-              parsed = JSON.parse(rawText);
-            } catch (e) {
-              parsed = { raw: rawText };
-            }
-            if (!r.ok) {
-              return {
-                error: {
-                  status: r.status,
-                  statusText: r.statusText,
-                  body: parsed,
-                  raw: rawText,
-                },
-                reason,
-              };
-            }
+            const up = await clailaUploadImageFromBase64(
+              imageBase64,
+              body.filename || "image.jpg",
+              body.mimetype || "image/jpeg"
+            );
+            clailaImageFileId = up.fileId;
           } catch (e) {
-            return { error: { message: "Fallback request failed", error: String(e) }, reason };
+            openaiError = {
+              message: "Claila image upload failed",
+              error: String(e)
+            };
           }
-
-          const fallbackReply = parsed?.choices?.[0]?.message?.content ?? parsed?.reply ?? parsed?.message ?? rawText;
-          return {
-            provider: "chatgpt5free",
-            model: "chatgpt5free",
-            reply: fallbackReply || "(no text)",
-            raw: parsed ?? rawText,
-            reason,
-          };
         }
-
-        // READ OPENAI KEY: prefer env variable, fallback to CONFIG_KV (persisted via GUI)
         let OPENAI_API_KEY = env.OPENAI_API_KEY || null;
         try {
           if (!OPENAI_API_KEY && env.CONFIG_KV) {
-            const maybe = await env.CONFIG_KV.get('OPENAI_API_KEY');
+            const maybe = await env.CONFIG_KV.get("OPENAI_API_KEY");
             if (maybe) OPENAI_API_KEY = maybe;
           }
         } catch (e) {
         }
-
-        let result = null;
         if (!model) {
           openaiError = { message: "Tier does not allow OpenAI chat" };
         } else if (!OPENAI_API_KEY) {
           openaiError = { message: "Server missing OpenAI API key" };
         } else {
           try {
-            const r = await fetch("https://api.openai.com/v1/chat/completions", {
-              method: "POST",
-              headers: {
-                "Authorization": `Bearer ${OPENAI_API_KEY}`,
-                "Content-Type": "application/json"
-              },
-              body: JSON.stringify({
-                model,
-                messages: [
-                  { role: "user", content: message }
-                ],
-                max_tokens: 800
-              })
-            });
+            const r = await fetch(
+              "https://api.openai.com/v1/chat/completions",
+              {
+                method: "POST",
+                headers: {
+                  Authorization: `Bearer ${OPENAI_API_KEY}`,
+                  "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                  model,
+                  messages: [{ role: "user", content: message }],
+                  max_tokens: 800
+                })
+              }
+            );
             const text = await r.text();
             let responseAI;
             try {
@@ -1074,146 +1374,153 @@ var index_default = {
                 model,
                 reply: reply ?? "(no text)",
                 raw: responseAI,
-                reason: null,
+                reason: null
               };
             }
           } catch (e) {
-            openaiError = { message: "Failed to reach OpenAI", error: String(e) };
+            openaiError = {
+              message: "Failed to reach OpenAI",
+              error: String(e)
+            };
           }
         }
-
         if (!result) {
-          const fallback = await callFallbackChat(message, openaiError ? "openai_unavailable" : "tier_not_allowed");
+          const fallback = await clailaFallbackChat(
+            message,
+            openaiError ? "openai_unavailable" : "tier_not_allowed",
+            clailaImageFileId
+          );
           if (fallback.error) {
-            return obfJson({ success: false, message: "Fallback provider failed", openai_error: openaiError, fallback_error: fallback.error }, { status: 502 });
+            return obfJson(
+              {
+                success: false,
+                message: "Claila fallback provider failed",
+                openai_error: openaiError,
+                fallback_error: fallback.error
+              },
+              { status: 502 }
+            );
           }
           result = fallback;
         }
-
-        return obfJson({
-          success: true,
-          username,
-          tier,
-          provider: result.provider,
-          model_used: result.model,
-          reply: result.reply,
-          raw: result.raw,
-          openai_error: openaiError,
-          fallback_reason: result.reason,
-        }, { status: 200 });
+        return obfJson(
+          {
+            success: true,
+            username,
+            tier,
+            provider: result.provider,
+            model_used: result.model,
+            reply: result.reply,
+            raw: result.raw,
+            openai_error: openaiError,
+            fallback_reason: result.reason
+          },
+          { status: 200 }
+        );
       }
-
-      if (url.pathname === "/transcribe" && request.method === "POST") {
-        let body = {};
-        try {
-          body = await request.json();
-        } catch (e) {
-          return obfJson({ success: false, message: "Invalid JSON body" }, { status: 400 });
-        }
-
-        const audioUrl = typeof body.audio_url === "string" ? body.audio_url.trim() : null;
-        if (!audioUrl) {
-          return obfJson({ success: false, message: "Missing audio_url" }, { status: 400 });
-        }
-
-        let hfToken = env.HF_API_TOKEN || null;
-        try {
-          if (!hfToken && env.CONFIG_KV) {
-            const maybe = await env.CONFIG_KV.get('HF_API_TOKEN');
-            if (maybe) hfToken = maybe;
-          }
-        } catch (e) {
-        }
-
-        let audioResp;
-        try {
-          audioResp = await fetch(audioUrl);
-        } catch (e) {
-          return obfJson({ success: false, message: "Failed to download audio" }, { status: 502 });
-        }
-        if (!audioResp || !audioResp.ok) {
-          return obfJson({ success: false, message: `Audio download failed (${audioResp?.status || 'unknown'})` }, { status: 502 });
-        }
-
-        const audioBuffer = await audioResp.arrayBuffer();
-        const contentType = audioResp.headers.get("content-type") || "application/octet-stream";
-
-        const apiUrl = env.HF_API_URL || "https://api-inference.huggingface.co/models/openai/whisper-tiny";
-        const headers = { "Content-Type": contentType };
-        if (hfToken) headers["Authorization"] = `Bearer ${hfToken}`;
-
-        try {
-          const r = await fetch(apiUrl, {
-            method: "POST",
-            headers,
-            body: audioBuffer
-          });
-          const raw = await r.json();
-          if (!r.ok) {
-            return obfJson({ success: false, message: "Transcription failed", status: r.status, raw }, { status: r.status || 502 });
-          }
-          const text = typeof raw.text === "string" ? raw.text.trim() : "";
-          if (!text) {
-            return obfJson({ success: false, message: "Transcription empty", raw }, { status: 502 });
-          }
-          return obfJson({ success: true, text }, { status: 200 });
-        } catch (e) {
-          return obfJson({ success: false, message: "Transcription error", error: String(e) }, { status: 502 });
-        }
-      }
-
       if (request.method === "GET" && url.pathname === "/validate") {
         const user = url.searchParams.get("user") || url.searchParams.get("username");
         const key = url.searchParams.get("key");
         const qHWID = url.searchParams.get("hwid") || null;
         const nonce = url.searchParams.get("nonce");
         const signature = url.searchParams.get("signature");
-        if (!user || !key) return json({ error: "Trūkst lietotājvārda vai atslēgas" }, { status: 400 });
+        if (!user || !key)
+          return json(
+            { error: "Tr\u016Bkst lietot\u0101jv\u0101rda vai atsl\u0113gas" },
+            { status: 400 }
+          );
         const d = await getRec(user);
-        if (!d) return obfJson({ valid: false, message: "Nepazīstams lietotājs" }, { status: 404 });
-        if (d.key !== key) return obfJson({ valid: false, message: "Nederīga licences atslēga" }, { status: 403 });
-        if (d.revoked) return obfJson({ valid: false, revoked: true, reason: d.reason, message: `Licence atcelta: ${d.reason}` }, { status: 403 });
+        if (!d)
+          return obfJson(
+            { valid: false, message: "Nepaz\u012Bstams lietot\u0101js" },
+            { status: 404 }
+          );
+        if (d.key !== key)
+          return obfJson(
+            { valid: false, message: "Neder\u012Bga licences atsl\u0113ga" },
+            { status: 403 }
+          );
+        if (d.revoked)
+          return obfJson(
+            {
+              valid: false,
+              revoked: true,
+              reason: d.reason,
+              message: `Licence atcelta: ${d.reason}`
+            },
+            { status: 403 }
+          );
         if (d.expires && Date.now() / 1e3 > d.expires) {
-          return obfJson({ valid: false, expired: true, message: "Licence beigusies." }, { status: 403 });
+          return obfJson(
+            { valid: false, expired: true, message: "Licence beigusies." },
+            { status: 403 }
+          );
         }
         if (!nonce || !signature || !qHWID) {
-          return obfJson({ valid: false, message: "Nepieciešams nonce, signature un hwid." }, { status: 400 });
+          return obfJson(
+            { valid: false, message: "Nepiecie\u0161ams nonce, signature un hwid." },
+            { status: 400 }
+          );
         }
         const nonceOwner = await lookupNonce(nonce);
         if (!nonceOwner || nonceOwner !== user) {
-          return obfJson({ valid: false, message: "Nederīgs vai beidzies nonce." }, { status: 403 });
+          return obfJson(
+            { valid: false, message: "Neder\u012Bgs vai beidzies nonce." },
+            { status: 403 }
+          );
         }
         const provided = parseSignature(signature);
-        if (!provided) return obfJson({ valid: false, message: "Nepareizs paraksta formāts." }, { status: 400 });
+        if (!provided)
+          return obfJson(
+            { valid: false, message: "Nepareizs paraksta form\u0101ts." },
+            { status: 400 }
+          );
         const enc = new TextEncoder();
         const messageBytes = enc.encode(`${nonce}${qHWID}`);
         const serverSig = await computeHMAC(d.key, messageBytes);
         if (!bytesEqual(serverSig, provided)) {
-          return obfJson({ valid: false, message: "Paraksts neder." }, { status: 403 });
+          return obfJson(
+            { valid: false, message: "Paraksts neder." },
+            { status: 403 }
+          );
         }
         try {
           if (env.RATE_KV) {
             const hv = `validate:${qHWID}`;
             const count = await kvIncrement(env.RATE_KV, hv, 60);
             if (count > 10) {
-              return obfJson({ valid: false, message: "Pārsniegts validate pieprasījumu limits šim HWID (10/min)." }, { status: 429 });
+              return obfJson(
+                {
+                  valid: false,
+                  message: "P\u0101rsniegts validate piepras\u012Bjumu limits \u0161im HWID (10/min)."
+                },
+                { status: 429 }
+              );
             }
           }
         } catch (e) {
         }
         if (!d.hwid)
-          return obfJson({ valid: false, message: "HWID nav saistīts. Pirmajai reizei nosūtiet POST { user,key,hwid,nonce,signature }." }, { status: 400 });
+          return obfJson(
+            {
+              valid: false,
+              message: "HWID nav saist\u012Bts. Pirmajai reizei nos\u016Btiet POST { user,key,hwid,nonce,signature }."
+            },
+            { status: 400 }
+          );
         if (qHWID && d.hwid !== qHWID)
-          return obfJson({ valid: false, message: "HWID nesakr\u012Bt" }, { status: 403 });
+          return obfJson(
+            { valid: false, message: "HWID nesakr\u012Bt" },
+            { status: 403 }
+          );
         return obfJson({
           valid: true,
           user,
           hwid: d.hwid,
           expires: d.expires ?? null,
-          message: "Licence derīga."
+          message: "Licence der\u012Bga."
         });
       }
-
       if (request.method === "POST" && (url.pathname === "/validate" || url.pathname === "/")) {
         let body = {};
         try {
@@ -1226,35 +1533,77 @@ var index_default = {
         const nonce = body.nonce;
         const signature = body.signature;
         if (!user || !key)
-          return json({ error: "Trūkst lietotājvārda vai atslēgas" }, { status: 400 });
+          return json(
+            { error: "Tr\u016Bkst lietot\u0101jv\u0101rda vai atsl\u0113gas" },
+            { status: 400 }
+          );
         const d = await getRec(user);
-        if (!d) return obfJson({ valid: false, message: "Nepazīstams lietotājs" }, { status: 404 });
-        if (d.key !== key) return obfJson({ valid: false, message: "Nederīga licences atslēga" }, { status: 403 });
-        if (d.revoked) return obfJson({ valid: false, revoked: true, reason: d.reason, message: `Licence atcelta: ${d.reason}` }, { status: 403 });
+        if (!d)
+          return obfJson(
+            { valid: false, message: "Nepaz\u012Bstams lietot\u0101js" },
+            { status: 404 }
+          );
+        if (d.key !== key)
+          return obfJson(
+            { valid: false, message: "Neder\u012Bga licences atsl\u0113ga" },
+            { status: 403 }
+          );
+        if (d.revoked)
+          return obfJson(
+            {
+              valid: false,
+              revoked: true,
+              reason: d.reason,
+              message: `Licence atcelta: ${d.reason}`
+            },
+            { status: 403 }
+          );
         if (d.expires && Date.now() / 1e3 > d.expires) {
-          return obfJson({ valid: false, expired: true, message: "Licence beigusies." }, { status: 403 });
+          return obfJson(
+            { valid: false, expired: true, message: "Licence beigusies." },
+            { status: 403 }
+          );
         }
         if (!nonce || !signature || !hwid) {
-          return obfJson({ valid: false, message: "Nepieciešams nonce, signature un hwid." }, { status: 400 });
+          return obfJson(
+            { valid: false, message: "Nepiecie\u0161ams nonce, signature un hwid." },
+            { status: 400 }
+          );
         }
         const nonceOwner = await lookupNonce(nonce);
         if (!nonceOwner || nonceOwner !== user) {
-          return obfJson({ valid: false, message: "Nederīgs vai beidzies nonce." }, { status: 403 });
+          return obfJson(
+            { valid: false, message: "Neder\u012Bgs vai beidzies nonce." },
+            { status: 403 }
+          );
         }
         const provided = parseSignature(signature);
-        if (!provided) return obfJson({ valid: false, message: "Nepareizs paraksta formāts." }, { status: 400 });
+        if (!provided)
+          return obfJson(
+            { valid: false, message: "Nepareizs paraksta form\u0101ts." },
+            { status: 400 }
+          );
         const enc = new TextEncoder();
         const messageBytes = enc.encode(`${nonce}${hwid}`);
         const serverSig = await computeHMAC(d.key, messageBytes);
         if (!bytesEqual(serverSig, provided)) {
-          return obfJson({ valid: false, message: "Paraksts neder." }, { status: 403 });
+          return obfJson(
+            { valid: false, message: "Paraksts neder." },
+            { status: 403 }
+          );
         }
         try {
           if (env.RATE_KV) {
             const hv = `validate:${hwid}`;
             const count = await kvIncrement(env.RATE_KV, hv, 60);
             if (count > 10) {
-              return obfJson({ valid: false, message: "Pārsniegts validate pieprasījumu limits šim HWID (10/min)." }, { status: 429 });
+              return obfJson(
+                {
+                  valid: false,
+                  message: "P\u0101rsniegts validate piepras\u012Bjumu limits \u0161im HWID (10/min)."
+                },
+                { status: 429 }
+              );
             }
           }
         } catch (e) {
@@ -1263,9 +1612,19 @@ var index_default = {
           try {
             if (env.RATE_KV) {
               const bindKey = `bind:${user}`;
-              const attempts = await kvIncrement(env.RATE_KV, bindKey, 24 * 3600);
+              const attempts = await kvIncrement(
+                env.RATE_KV,
+                bindKey,
+                24 * 3600
+              );
               if (attempts > 3) {
-                return obfJson({ valid: false, message: "Pārsniegts HWID sasaistes mēģinājumu limits (3/24h)." }, { status: 429 });
+                return obfJson(
+                  {
+                    valid: false,
+                    message: "P\u0101rsniegts HWID sasaistes m\u0113\u0123in\u0101jumu limits (3/24h)."
+                  },
+                  { status: 429 }
+                );
               }
             }
           } catch (e) {
@@ -1273,24 +1632,27 @@ var index_default = {
           d.hwid = hwid;
           await env.LICENSES_KV.put(user, JSON.stringify(d));
         } else if (hwid && hwid !== d.hwid) {
-          return obfJson({ valid: false, message: "HWID nesakr\u012Bt" }, { status: 403 });
+          return obfJson(
+            { valid: false, message: "HWID nesakr\u012Bt" },
+            { status: 403 }
+          );
         }
         return obfJson({
           valid: true,
           user,
           hwid: d.hwid,
           expires: d.expires ?? null,
-          message: "Licence derīga."
+          message: "Licence der\u012Bga."
         });
       }
       return new Response("Nav atrasts", { status: 404 });
     } catch (err) {
       console.error("Worker exception:", err?.stack || err);
-      return new Response("Iekšēja kļūda", { status: 500 });
+      return new Response("Iek\u0161\u0113ja k\u013C\u016Bda", { status: 500 });
     }
   }
 };
 export {
   index_default as default
 };
-//# sourceMappingURL=index.secure.js.map
+//# sourceMappingURL=index.js.map
