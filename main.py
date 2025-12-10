@@ -51,6 +51,13 @@ LICENSE_FILE = CONFIG_DIR / "license.json"
 
 DEFAULT_OPENAI_KEY = os.getenv("UZDEVUMI_OPENAI_KEY")
 
+# feature toggles
+ENABLE_IMAGE_SUPPORT = (os.getenv("UZDEVUMI_ENABLE_IMAGES", "1") or "1").lower() not in {
+    "0",
+    "false",
+    "off",
+}
+
 # filesystem defaults
 SECURE_DIR_MODE = 0o700
 SECURE_FILE_MODE = 0o600
@@ -567,6 +574,7 @@ class TaskData:
     dropdown_ids: List[Optional[str]]
     drag_targets: List[DragTarget]
     drag_options: List[DragOption]
+    images_base64: List[str]
 
 
 Logger = Optional[Callable[[str], None]]
@@ -653,7 +661,11 @@ def clear_cookies(driver) -> None:
         pass
 
 
-def build_fast_driver(incognito: bool = True, new_window: bool = False, block_images: bool = True):
+def build_fast_driver(
+    incognito: bool = True,
+    new_window: bool = False,
+    block_images: bool = not ENABLE_IMAGE_SUPPORT,
+):
     options = uc.ChromeOptions()
     if incognito:
         options.add_argument("--incognito")
@@ -775,6 +787,8 @@ img, .gxs-resource-image, .gxst-resource-image,
 
 
 def apply_hide_media_css(driver) -> None:
+    if ENABLE_IMAGE_SUPPORT:
+        return
     try:
         driver.execute_script(
             """
@@ -1228,6 +1242,7 @@ def fetch_task(driver, lang: str, logger: Logger = None) -> Optional[TaskData]:
     drag_options_raw = wrapper.find_elements(By.CSS_SELECTOR, ".gxs-dnd-option")
     drag_targets: List[DragTarget] = []
     drag_options: List[DragOption] = []
+    images_base64: List[str] = []
 
     for idx, field in enumerate(drag_fields, start=1):
         hidden = None
@@ -1251,7 +1266,16 @@ def fetch_task(driver, lang: str, logger: Logger = None) -> Optional[TaskData]:
         By.CSS_SELECTOR,
         "img,[style*='background-image'],.gxs-resource-image,.gxst-resource-image",
     )
-    if media and not has_drag:
+    for item in media:
+        try:
+            shot = item.screenshot_as_png
+            if shot:
+                images_base64.append(base64.b64encode(shot).decode("utf-8"))
+        except Exception:
+            continue
+        if len(images_base64) >= 3:
+            break
+    if media and not has_drag and not images_base64:
         log_message(T(lang, "img_task_skip"), logger)
         return "SKIP"
 
@@ -1317,6 +1341,7 @@ def fetch_task(driver, lang: str, logger: Logger = None) -> Optional[TaskData]:
         dropdown_ids=dropdown_ids,
         drag_targets=drag_targets,
         drag_options=drag_options,
+        images_base64=images_base64,
     )
 
 
@@ -1448,6 +1473,54 @@ class ChatGPTSession:
             pass
 
 
+class KeysysChatClient:
+    """Lightweight client for the Keysys worker /msg endpoint."""
+
+    def __init__(self, lang: str, logger: Logger = None):
+        self.lang = lang
+        self.logger = logger
+        self._refresh_license()
+
+    def _refresh_license(self) -> None:
+        self.ks_user, self.ks_key, _ = load_license_record()
+
+    def _log(self, msg: str) -> None:
+        log_message(msg, self.logger)
+
+    def ask(self, prompt: str, image_b64: Optional[str] = None) -> str:
+        self._refresh_license()
+        if not self.ks_key:
+            self._log("⚠️ Licence key missing for worker chat; skipping request")
+            return ""
+
+        payload: Dict[str, object] = {"key": self.ks_key, "message": prompt}
+        if self.ks_user:
+            payload["user"] = self.ks_user
+        if image_b64:
+            payload["image_base64"] = image_b64
+            payload["filename"] = "task-image.png"
+            payload["mimetype"] = "image/png"
+
+        try:
+            res = requests.post(f"{KEYSYS_BASE}/msg", json=payload, timeout=25)
+            data = res.json()
+        except Exception as exc:  # pragma: no cover - network safety
+            self._log(f"⚠️ Worker AI request failed: {exc}")
+            return ""
+
+        if not res.ok or not data.get("success"):
+            status_note = data.get("message") if isinstance(data, dict) else None
+            self._log(
+                f"⚠️ Worker AI rejected request ({res.status_code}): {status_note or 'unknown error'}"
+            )
+            return ""
+
+        reply = data.get("reply") or data.get("message") or ""
+        if not reply:
+            self._log("⚠️ Worker AI returned an empty reply")
+        return str(reply)
+
+
 # ----------------------- Prompt / parser -----------------
 
 
@@ -1476,6 +1549,13 @@ def build_prompt(task: TaskData, lang: str) -> str:
             lettered = [f"{chr(ord('A')+j)}. {txt}" for j, txt in enumerate(opts)]
             lines.append(f"{i}) " + " | ".join(lettered))
         parts.extend(["", T(lang, "p_drop_hdr"), "\n".join(lines)])
+    if task.images_base64:
+        parts.extend(
+            [
+                "",
+                "An image is attached to this prompt. Use it to answer if relevant.",
+            ]
+        )
     return "\n".join(parts)
 
 
@@ -1743,7 +1823,13 @@ def fill_drag_targets(driver, task: TaskData, values: List[int], lang, logger: L
 
 # ----------------------- Orchestrator -------------------
 
-def solve_one_task(main_driver, gpt: ChatGPTSession, lang: str, logger: Logger = None) -> float:
+def solve_one_task(
+    main_driver,
+    gpt: ChatGPTSession,
+    worker_ai: Optional[KeysysChatClient],
+    lang: str,
+    logger: Logger = None,
+) -> float:
     def select_and_fetch():
         ok = select_task(main_driver, lang, logger)
         if not ok:
@@ -1765,30 +1851,40 @@ def solve_one_task(main_driver, gpt: ChatGPTSession, lang: str, logger: Logger =
         log_message(T(lang, "no_valid"), logger)
         return 0.0
 
+    prompt = build_prompt(task, lang)
     answer = ""
-    try:
-        answer = gpt.ask_task(task)
-        if (
-            "Priekšmets:" in task.text
-            and ("⚠" in answer or "skipping task" in answer.lower() or "Atveru ChatGPT" in answer)
-        ):
-            raise RuntimeError("GPT fallback skipped or failed — retrying with new token")
-    except Exception:
-        log_message("⚠  fetching new token…", logger)
-        new_token = fetch_chatgpt5free_token(max_wait=8.0)
-        if new_token and new_token.startswith("Bearer "):
-            new_token = new_token[len("Bearer ") :]
-        if new_token:
-            gpt._swap_client(new_token)
-            log_message("↻ Retrying GPT task with new token", logger)
-            try:
-                answer = gpt.ask_task(task)
-            except Exception:
-                log_message("⚠  skipping task (again)", logger)
+    if worker_ai:
+        try:
+            image_b64 = task.images_base64[0] if task.images_base64 else None
+            answer = worker_ai.ask(prompt, image_b64=image_b64)
+        except Exception:
+            log_message("⚠  worker AI failed — falling back to local GPT", logger)
+            answer = ""
+
+    if not answer:
+        try:
+            answer = gpt.ask_task(task)
+            if (
+                "Priekšmets:" in task.text
+                and ("⚠" in answer or "skipping task" in answer.lower() or "Atveru ChatGPT" in answer)
+            ):
+                raise RuntimeError("GPT fallback skipped or failed — retrying with new token")
+        except Exception:
+            log_message("⚠  fetching new token…", logger)
+            new_token = fetch_chatgpt5free_token(max_wait=8.0)
+            if new_token and new_token.startswith("Bearer "):
+                new_token = new_token[len("Bearer ") :]
+            if new_token:
+                gpt._swap_client(new_token)
+                log_message("↻ Retrying GPT task with new token", logger)
+                try:
+                    answer = gpt.ask_task(task)
+                except Exception:
+                    log_message("⚠  skipping task (again)", logger)
+                    return 0.0
+            else:
+                log_message("⚠  token not found — skipping task", logger)
                 return 0.0
-        else:
-            log_message("⚠  token not found — skipping task", logger)
-            return 0.0
 
     parsed = parse_answer(answer, task)
 
@@ -1827,7 +1923,9 @@ def run_automation(
         license_key_arg=license_key,
     )
 
-    driver = build_fast_driver(incognito=True, new_window=False, block_images=True)
+    driver = build_fast_driver(
+        incognito=True, new_window=False, block_images=not ENABLE_IMAGE_SUPPORT
+    )
     clear_cookies(driver)
 
     def recreate_main():
@@ -1842,9 +1940,12 @@ def run_automation(
             except Exception:
                 pass
         finally:
-            driver = build_fast_driver(incognito=True, new_window=False, block_images=True)
+            driver = build_fast_driver(
+                incognito=True, new_window=False, block_images=not ENABLE_IMAGE_SUPPORT
+            )
 
     gpt_session: Optional[ChatGPTSession] = None
+    worker_ai: Optional[KeysysChatClient] = None
     try:
         with_resilience(
             lambda: login(driver, user, password, lang, logger),
@@ -1854,6 +1955,7 @@ def run_automation(
             retries=3,
         )
         gpt_session = ChatGPTSession(lang=lang, logger=logger)
+        worker_ai = KeysysChatClient(lang=lang, logger=logger)
 
         start_top = read_top_points(driver) or 0
         if until_top is not None:
@@ -1873,7 +1975,7 @@ def run_automation(
             round_idx += 1
             log_message(T(lang, "cycle", x=round_idx), logger)
             try:
-                _ = solve_one_task(driver, gpt_session, lang, logger)
+                _ = solve_one_task(driver, gpt_session, worker_ai, lang, logger)
             except Exception:
                 log_message("↻ Restarting browsers…", logger)
                 recreate_main()
