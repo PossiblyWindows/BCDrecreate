@@ -261,6 +261,7 @@ I18N = {
         "worker_empty_reply": "⚠️ Worker AI atgrieza tukšu atbildi",
         "worker_fallback": "⚠️ Worker AI kļūme — izmantojam vietējo GPT",
         "token_refreshed": "↺ GPT marķieris atjaunots",
+        "token_init_failed": "⚠️ Nevar iegūt GPT marķieri — pārbaudi interneta savienojumu un mēģini vēlreiz",
         "retry_wait": "↻ …",
         "token_fetch": "⚠️ Iegūstam jaunu marķieri…",
         "token_retry": "↻ Mēģinu vēlreiz ar jaunu GPT marķieri",
@@ -359,6 +360,7 @@ I18N = {
         "worker_empty_reply": "⚠️ Worker AI returned an empty reply",
         "worker_fallback": "⚠️ Worker AI failed — falling back to local GPT",
         "token_refreshed": "↺ GPT token refreshed",
+        "token_init_failed": "⚠️ Unable to obtain a GPT token — check your connection and try again",
         "retry_wait": "↻ …",
         "token_fetch": "⚠️ fetching new token…",
         "token_retry": "↻ Retrying GPT task with new token",
@@ -457,6 +459,7 @@ I18N = {
         "worker_empty_reply": "⚠️ Worker AI вернул пустой ответ",
         "worker_fallback": "⚠️ Сбой Worker AI — используем локальный GPT",
         "token_refreshed": "↺ Токен GPT обновлён",
+        "token_init_failed": "⚠️ Не удаётся получить токен GPT — проверьте соединение и повторите",
         "retry_wait": "↻ …",
         "token_fetch": "⚠️ Получаем новый токен…",
         "token_retry": "↻ Повторяем с новым токеном GPT",
@@ -666,6 +669,19 @@ def log_message(message: str, logger: Logger = None) -> None:
             logger(message)
         except Exception:
             pass
+
+
+def dev_log(label: str, payload: object, logger: Logger = None, max_len: int = 1200) -> None:
+    try:
+        txt = json.dumps(payload, ensure_ascii=False, default=str)
+    except Exception:
+        try:
+            txt = str(payload)
+        except Exception:
+            txt = "<unserializable>"
+    if len(txt) > max_len:
+        txt = txt[:max_len] + "... (truncated)"
+    log_message(f"[dev] {label}: {txt}", logger)
 
 
 def w(driver, css: str, timeout: int = 7, cond: str = "present"):
@@ -1443,27 +1459,41 @@ def fetch_chatgpt5free_token(max_wait: float = 8.0) -> Optional[str]:
 class ChatGPTSession:
     """Async OpenAI wrapper with background loop and graceful teardown."""
 
-    def __init__(self, lang: str, logger: Logger = None):
-        self.lang = lang
-        self.logger = logger
-        self._client_lock = threading.Lock()
-        self.model = "gpt-5.1-latest-chat"
-        self.api_key = os.getenv("UZDEVUMI_OPENAI_KEY") or DEFAULT_OPENAI_KEY
-        if not self.api_key:
+    @staticmethod
+    def _resolve_api_key(lang: str, logger: Logger = None) -> Optional[str]:
+        key = os.getenv("UZDEVUMI_OPENAI_KEY") or DEFAULT_OPENAI_KEY
+        if key:
+            return key.strip()
+
+        delay = 1.5
+        for attempt in range(3):
+            log_message(T(lang, "token_fetch"), logger)
             token = fetch_chatgpt5free_token(max_wait=10.0)
             if token and token.startswith("Bearer "):
                 token = token[len("Bearer ") :]
-            self.api_key = token
-        if not self.api_key:
-            raise RuntimeError("OpenAI API key missing. Set UZDEVUMI_OPENAI_KEY or configure the worker key store.")
-        self.client = AsyncOpenAI(api_key=self.api_key, timeout=15)
+            if token:
+                return token
+            time.sleep(delay)
+            delay *= 1.5
+
+        log_message(T(lang, "token_init_failed"), logger)
+        return None
+
+    def __init__(self, lang: str, logger: Logger = None, dev_mode: bool = False):
+        self.lang = lang
+        self.logger = logger
+        self.dev_mode = dev_mode
+        self._client_lock = threading.Lock()
+        self.model = "gpt-5.1-latest-chat"
+        self.api_key = self._resolve_api_key(lang, logger)
+        self.client = AsyncOpenAI(api_key=self.api_key, timeout=15) if self.api_key else None
         self._loop = asyncio.new_event_loop()
         self._loop_thread = threading.Thread(
             target=self._run_loop, name="gpt-loop", daemon=True
         )
         self._loop_thread.start()
 
-        if not os.getenv("UZDEVUMI_OPENAI_KEY"):
+        if not os.getenv("UZDEVUMI_OPENAI_KEY") and self.api_key:
             threading.Thread(
                 target=self._try_upgrade_token,
                 name="gpt-token-upgrade",
@@ -1488,6 +1518,16 @@ class ChatGPTSession:
                 )
             user_content = content_blocks
         log_message(T(self.lang, "open_gpt"), self.logger)
+        if self.dev_mode:
+            payload_preview = {
+                "model": self.model,
+                "messages": [
+                    {"role": "system", "content": T(self.lang, "p1")},
+                    {"role": "user", "content": "[text+image]" if task.images_base64 else prompt},
+                ],
+                "has_image": bool(task.images_base64),
+            }
+            dev_log("GPT request", payload_preview, self.logger)
         resp = await self.client.chat.completions.create(
             model=self.model,
             messages=[
@@ -1498,10 +1538,27 @@ class ChatGPTSession:
             max_tokens=1024,
         )
         answer = resp.choices[0].message.content.strip()
+        if self.dev_mode:
+            try:
+                dev_log(
+                    "GPT response",
+                    {
+                        "id": resp.id,
+                        "model": resp.model,
+                        "finish_reason": resp.choices[0].finish_reason,
+                        "usage": resp.usage.model_dump(),
+                        "answer": answer,
+                    },
+                    self.logger,
+                )
+            except Exception:
+                dev_log("GPT response", {"answer": answer}, self.logger)
         log_message(T(self.lang, "gpt_ans", x=answer), self.logger)
         return answer
 
     def ask_task(self, task: TaskData) -> str:
+        if not self._ensure_client():
+            return ""
         future = asyncio.run_coroutine_threadsafe(
             self._ask_task_async(task), self._loop
         )
@@ -1543,13 +1600,34 @@ class ChatGPTSession:
         except Exception:
             pass
 
+    def _ensure_client(self) -> bool:
+        if self.client:
+            return True
+        try:
+            key = self._resolve_api_key(self.lang, self.logger)
+        except Exception:
+            key = None
+
+        if not key:
+            log_message(T(self.lang, "token_missing"), self.logger)
+            return False
+
+        try:
+            self.api_key = key
+            self.client = AsyncOpenAI(api_key=self.api_key, timeout=15)
+            return True
+        except Exception:
+            log_message(T(self.lang, "token_init_failed"), self.logger)
+            return False
+
 
 class KeysysChatClient:
     """Lightweight client for the Keysys worker /msg endpoint."""
 
-    def __init__(self, lang: str, logger: Logger = None):
+    def __init__(self, lang: str, logger: Logger = None, dev_mode: bool = False):
         self.lang = lang
         self.logger = logger
+        self.dev_mode = dev_mode
         self._refresh_license()
 
     def _refresh_license(self) -> None:
@@ -1571,6 +1649,13 @@ class KeysysChatClient:
             payload["image_base64"] = image_b64
             payload["filename"] = "task-image.png"
             payload["mimetype"] = "image/png"
+
+        if self.dev_mode:
+            scrubbed = dict(payload)
+            scrubbed["key"] = "<redacted>"
+            if "image_base64" in scrubbed:
+                scrubbed["image_base64"] = f"<len={len(scrubbed['image_base64'])} chars>"
+            dev_log("Worker payload", scrubbed, self.logger)
 
         try:
             res = requests.post(f"{KEYSYS_BASE}/msg", json=payload, timeout=25)
@@ -1594,6 +1679,8 @@ class KeysysChatClient:
         reply = data.get("reply") or data.get("message") or ""
         if not reply:
             self._log(T(self.lang, "worker_empty_reply"))
+        if self.dev_mode:
+            dev_log("Worker response", data, self.logger)
         return str(reply)
 
 
@@ -1903,7 +1990,7 @@ def fill_drag_targets(driver, task: TaskData, values: List[int], lang, logger: L
 
 def solve_one_task(
     main_driver,
-    gpt: ChatGPTSession,
+    gpt: Optional[ChatGPTSession],
     worker_ai: Optional[KeysysChatClient],
     lang: str,
     logger: Logger = None,
@@ -1939,7 +2026,7 @@ def solve_one_task(
             log_message(T(lang, "worker_fallback"), logger)
             answer = ""
 
-    if not answer:
+    if not answer and gpt:
         try:
             answer = gpt.ask_task(task)
             if (
@@ -1963,6 +2050,9 @@ def solve_one_task(
             else:
                 log_message(T(lang, "token_missing"), logger)
                 return 0.0
+    elif not answer and not gpt:
+        log_message(T(lang, "token_missing"), logger)
+        return 0.0
 
     parsed = parse_answer(answer, task)
 
@@ -1988,6 +2078,7 @@ def run_automation(
     lang: str = "lv",
     logger: Logger = None,
     debug: bool = False,
+    dev_mode: bool = False,
     until_top: Optional[int] = None,
     gain_points: Optional[float] = None,
     keysys_user: Optional[str] = None,
@@ -2032,8 +2123,15 @@ def run_automation(
             logger,
             retries=3,
         )
-        gpt_session = ChatGPTSession(lang=lang, logger=logger)
-        worker_ai = KeysysChatClient(lang=lang, logger=logger)
+        try:
+            gpt_session = ChatGPTSession(lang=lang, logger=logger, dev_mode=dev_mode)
+        except Exception:
+            log_message(T(lang, "token_missing"), logger)
+            gpt_session = None
+        try:
+            worker_ai = KeysysChatClient(lang=lang, logger=logger, dev_mode=dev_mode)
+        except Exception:
+            worker_ai = None
 
         start_top = read_top_points(driver) or 0
         if until_top is not None:
@@ -2310,6 +2408,7 @@ def run_customtkinter_ui(ctk, default_lang: str = "lv", debug_default: bool = Fa
         u: str,
         p: str,
         dbg: bool,
+        dev: bool,
         until_val: Optional[int],
         gain_val: Optional[float],
         lang_sel: str,
@@ -2324,6 +2423,7 @@ def run_customtkinter_ui(ctk, default_lang: str = "lv", debug_default: bool = Fa
                 lang=lang_sel,
                 logger=append_log,
                 debug=dbg,
+                dev_mode=dev,
                 until_top=until_val,
                 gain_points=gain_val,
                 keysys_user=ks_user,
@@ -2378,6 +2478,7 @@ def run_customtkinter_ui(ctk, default_lang: str = "lv", debug_default: bool = Fa
                 u,
                 p,
                 dbg_var.get(),
+                False,
                 until_val,
                 gain_val,
                 lang_var.get(),
@@ -2433,6 +2534,7 @@ def main(argv: Optional[List[str]] = None) -> None:
     )
     parser.add_argument("--lang", choices=["lv", "en", "ru"], default="lv", help="UI/log/prompt language")
     parser.add_argument("--debug", action="store_true", help="Keep browsers open at the end")
+    parser.add_argument("--dev", action="store_true", help="Verbose dev logs (requests and responses)")
     parser.add_argument("--until-top", type=int, help="Stop when Top points reach this absolute value")
     parser.add_argument("--gain", type=float, help="Stop after gaining this many Top points relative to start")
     parser.add_argument("--nogui", action="store_true", help="Run without GUI (pure CLI)")
@@ -2470,6 +2572,7 @@ def main(argv: Optional[List[str]] = None) -> None:
             lang=args.lang,
             logger=None,
             debug=args.debug,
+            dev_mode=args.dev,
             until_top=args.until_top,
             gain_points=args.gain,
             keysys_user=args.license_user,
