@@ -941,20 +941,32 @@ class LicenseManager:
         self.logger = logger
         self._tier_cache: Dict[str, Optional[str]] = {"user": None, "key": None, "value": None, "ts": 0.0}
         self._trial_forced_end = False
+        self._trial_cache: Dict[str, Optional[float]] = {"user": None, "value": None, "ts": 0.0}
 
     def _trial_seconds_left(self, ks_user: Optional[str]) -> int:
         if self._trial_forced_end or not ks_user:
             return 0
+        now = time.time()
+        cache = self._trial_cache
+        cached_remaining: Optional[int] = None
+        if cache["user"] == ks_user and cache["value"] is not None:
+            cached_remaining = max(0, int(cache["value"] - (now - (cache["ts"] or 0.0))))
+            if now - (cache["ts"] or 0.0) < 60:
+                return cached_remaining
         try:
             res = requests.get(KEYSYS_BASE + "/trial", params={"user": ks_user}, timeout=10)
             js = res.json()
             if js.get("valid") and js.get("trial") == "active":
                 left = int(js.get("remaining_seconds") or 0)
+                self._trial_cache = {"user": ks_user, "value": float(left), "ts": now}
                 log_message(T(self.lang, "lic_trial_left", m=int(left / 60)), self.logger)
                 return max(0, left)
+            self._trial_cache = {"user": ks_user, "value": 0.0, "ts": now}
             log_message(T(self.lang, "lic_trial_expired"), self.logger)
         except Exception as e:
             log_message(T(self.lang, "lic_error", e=str(e)), self.logger)
+            if cached_remaining is not None:
+                return cached_remaining
         return 0
 
     def burn_trial(self) -> None:
@@ -1055,10 +1067,8 @@ class LicenseManager:
     def status(self) -> Dict[str, Optional[str]]:
         ks_user, ks_key, _ = self._stored()
         if ks_user and ks_key:
-            ok, _ = self.validate_and_store(ks_user, ks_key)
-            if ok:
-                tier = self._get_tier(ks_user, ks_key) or "Basic"
-                return {"state": "licensed", "user": ks_user, "left_seconds": None, "tier": tier}
+            tier = self._get_tier(ks_user, ks_key) or "Basic"
+            return {"state": "licensed", "user": ks_user, "left_seconds": None, "tier": tier}
 
         left = self._trial_seconds_left(ks_user)
         if left > 0:
