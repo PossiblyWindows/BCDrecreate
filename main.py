@@ -671,6 +671,19 @@ def log_message(message: str, logger: Logger = None) -> None:
             pass
 
 
+def dev_log(label: str, payload: object, logger: Logger = None, max_len: int = 1200) -> None:
+    try:
+        txt = json.dumps(payload, ensure_ascii=False, default=str)
+    except Exception:
+        try:
+            txt = str(payload)
+        except Exception:
+            txt = "<unserializable>"
+    if len(txt) > max_len:
+        txt = txt[:max_len] + "... (truncated)"
+    log_message(f"[dev] {label}: {txt}", logger)
+
+
 def w(driver, css: str, timeout: int = 7, cond: str = "present"):
     try:
         cond_map = {
@@ -1469,6 +1482,7 @@ class ChatGPTSession:
     def __init__(self, lang: str, logger: Logger = None):
         self.lang = lang
         self.logger = logger
+        self.dev_mode = dev_mode
         self._client_lock = threading.Lock()
         self.model = "gpt-5.1-latest-chat"
         self.api_key = self._resolve_api_key(lang, logger)
@@ -1504,6 +1518,16 @@ class ChatGPTSession:
                 )
             user_content = content_blocks
         log_message(T(self.lang, "open_gpt"), self.logger)
+        if self.dev_mode:
+            payload_preview = {
+                "model": self.model,
+                "messages": [
+                    {"role": "system", "content": T(self.lang, "p1")},
+                    {"role": "user", "content": "[text+image]" if task.images_base64 else prompt},
+                ],
+                "has_image": bool(task.images_base64),
+            }
+            dev_log("GPT request", payload_preview, self.logger)
         resp = await self.client.chat.completions.create(
             model=self.model,
             messages=[
@@ -1514,6 +1538,21 @@ class ChatGPTSession:
             max_tokens=1024,
         )
         answer = resp.choices[0].message.content.strip()
+        if self.dev_mode:
+            try:
+                dev_log(
+                    "GPT response",
+                    {
+                        "id": resp.id,
+                        "model": resp.model,
+                        "finish_reason": resp.choices[0].finish_reason,
+                        "usage": resp.usage.model_dump(),
+                        "answer": answer,
+                    },
+                    self.logger,
+                )
+            except Exception:
+                dev_log("GPT response", {"answer": answer}, self.logger)
         log_message(T(self.lang, "gpt_ans", x=answer), self.logger)
         return answer
 
@@ -1585,9 +1624,10 @@ class ChatGPTSession:
 class KeysysChatClient:
     """Lightweight client for the Keysys worker /msg endpoint."""
 
-    def __init__(self, lang: str, logger: Logger = None):
+    def __init__(self, lang: str, logger: Logger = None, dev_mode: bool = False):
         self.lang = lang
         self.logger = logger
+        self.dev_mode = dev_mode
         self._refresh_license()
 
     def _refresh_license(self) -> None:
@@ -1609,6 +1649,13 @@ class KeysysChatClient:
             payload["image_base64"] = image_b64
             payload["filename"] = "task-image.png"
             payload["mimetype"] = "image/png"
+
+        if self.dev_mode:
+            scrubbed = dict(payload)
+            scrubbed["key"] = "<redacted>"
+            if "image_base64" in scrubbed:
+                scrubbed["image_base64"] = f"<len={len(scrubbed['image_base64'])} chars>"
+            dev_log("Worker payload", scrubbed, self.logger)
 
         try:
             res = requests.post(f"{KEYSYS_BASE}/msg", json=payload, timeout=25)
@@ -1632,6 +1679,8 @@ class KeysysChatClient:
         reply = data.get("reply") or data.get("message") or ""
         if not reply:
             self._log(T(self.lang, "worker_empty_reply"))
+        if self.dev_mode:
+            dev_log("Worker response", data, self.logger)
         return str(reply)
 
 
@@ -2029,6 +2078,7 @@ def run_automation(
     lang: str = "lv",
     logger: Logger = None,
     debug: bool = False,
+    dev_mode: bool = False,
     until_top: Optional[int] = None,
     gain_points: Optional[float] = None,
     keysys_user: Optional[str] = None,
@@ -2358,6 +2408,7 @@ def run_customtkinter_ui(ctk, default_lang: str = "lv", debug_default: bool = Fa
         u: str,
         p: str,
         dbg: bool,
+        dev: bool,
         until_val: Optional[int],
         gain_val: Optional[float],
         lang_sel: str,
@@ -2372,6 +2423,7 @@ def run_customtkinter_ui(ctk, default_lang: str = "lv", debug_default: bool = Fa
                 lang=lang_sel,
                 logger=append_log,
                 debug=dbg,
+                dev_mode=dev,
                 until_top=until_val,
                 gain_points=gain_val,
                 keysys_user=ks_user,
@@ -2426,6 +2478,7 @@ def run_customtkinter_ui(ctk, default_lang: str = "lv", debug_default: bool = Fa
                 u,
                 p,
                 dbg_var.get(),
+                False,
                 until_val,
                 gain_val,
                 lang_var.get(),
@@ -2481,6 +2534,7 @@ def main(argv: Optional[List[str]] = None) -> None:
     )
     parser.add_argument("--lang", choices=["lv", "en", "ru"], default="lv", help="UI/log/prompt language")
     parser.add_argument("--debug", action="store_true", help="Keep browsers open at the end")
+    parser.add_argument("--dev", action="store_true", help="Verbose dev logs (requests and responses)")
     parser.add_argument("--until-top", type=int, help="Stop when Top points reach this absolute value")
     parser.add_argument("--gain", type=float, help="Stop after gaining this many Top points relative to start")
     parser.add_argument("--nogui", action="store_true", help="Run without GUI (pure CLI)")
@@ -2518,6 +2572,7 @@ def main(argv: Optional[List[str]] = None) -> None:
             lang=args.lang,
             logger=None,
             debug=args.debug,
+            dev_mode=args.dev,
             until_top=args.until_top,
             gain_points=args.gain,
             keysys_user=args.license_user,
