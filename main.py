@@ -1479,7 +1479,7 @@ class ChatGPTSession:
         )
         self._loop_thread.start()
 
-        if not os.getenv("UZDEVUMI_OPENAI_KEY"):
+        if not os.getenv("UZDEVUMI_OPENAI_KEY") and self.api_key:
             threading.Thread(
                 target=self._try_upgrade_token,
                 name="gpt-token-upgrade",
@@ -1518,6 +1518,8 @@ class ChatGPTSession:
         return answer
 
     def ask_task(self, task: TaskData) -> str:
+        if not self._ensure_client():
+            return ""
         future = asyncio.run_coroutine_threadsafe(
             self._ask_task_async(task), self._loop
         )
@@ -1558,6 +1560,26 @@ class ChatGPTSession:
             asyncio.run_coroutine_threadsafe(old_client.close(), self._loop).result(8)
         except Exception:
             pass
+
+    def _ensure_client(self) -> bool:
+        if self.client:
+            return True
+        try:
+            key = self._resolve_api_key(self.lang, self.logger)
+        except Exception:
+            key = None
+
+        if not key:
+            log_message(T(self.lang, "token_missing"), self.logger)
+            return False
+
+        try:
+            self.api_key = key
+            self.client = AsyncOpenAI(api_key=self.api_key, timeout=15)
+            return True
+        except Exception:
+            log_message(T(self.lang, "token_init_failed"), self.logger)
+            return False
 
 
 class KeysysChatClient:
