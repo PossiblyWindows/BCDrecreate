@@ -1447,7 +1447,7 @@ class ChatGPTSession:
     """Async OpenAI wrapper with background loop and graceful teardown."""
 
     @staticmethod
-    def _resolve_api_key(lang: str, logger: Logger = None) -> Optional[str]:
+    def _resolve_api_key(lang: str, logger: Logger = None) -> str:
         key = os.getenv("UZDEVUMI_OPENAI_KEY") or DEFAULT_OPENAI_KEY
         if key:
             return key.strip()
@@ -1464,7 +1464,7 @@ class ChatGPTSession:
             delay *= 1.5
 
         log_message(T(lang, "token_init_failed"), logger)
-        return None
+        raise RuntimeError(T(lang, "token_init_failed"))
 
     def __init__(self, lang: str, logger: Logger = None):
         self.lang = lang
@@ -1472,7 +1472,7 @@ class ChatGPTSession:
         self._client_lock = threading.Lock()
         self.model = "gpt-5.1-latest-chat"
         self.api_key = self._resolve_api_key(lang, logger)
-        self.client = AsyncOpenAI(api_key=self.api_key, timeout=15) if self.api_key else None
+        self.client = AsyncOpenAI(api_key=self.api_key, timeout=15)
         self._loop = asyncio.new_event_loop()
         self._loop_thread = threading.Thread(
             target=self._run_loop, name="gpt-loop", daemon=True
