@@ -261,6 +261,7 @@ I18N = {
         "worker_empty_reply": "⚠️ Worker AI atgrieza tukšu atbildi",
         "worker_fallback": "⚠️ Worker AI kļūme — izmantojam vietējo GPT",
         "token_refreshed": "↺ GPT marķieris atjaunots",
+        "token_init_failed": "⚠️ Nevar iegūt GPT marķieri — pārbaudi interneta savienojumu un mēģini vēlreiz",
         "retry_wait": "↻ …",
         "token_fetch": "⚠️ Iegūstam jaunu marķieri…",
         "token_retry": "↻ Mēģinu vēlreiz ar jaunu GPT marķieri",
@@ -359,6 +360,7 @@ I18N = {
         "worker_empty_reply": "⚠️ Worker AI returned an empty reply",
         "worker_fallback": "⚠️ Worker AI failed — falling back to local GPT",
         "token_refreshed": "↺ GPT token refreshed",
+        "token_init_failed": "⚠️ Unable to obtain a GPT token — check your connection and try again",
         "retry_wait": "↻ …",
         "token_fetch": "⚠️ fetching new token…",
         "token_retry": "↻ Retrying GPT task with new token",
@@ -457,6 +459,7 @@ I18N = {
         "worker_empty_reply": "⚠️ Worker AI вернул пустой ответ",
         "worker_fallback": "⚠️ Сбой Worker AI — используем локальный GPT",
         "token_refreshed": "↺ Токен GPT обновлён",
+        "token_init_failed": "⚠️ Не удаётся получить токен GPT — проверьте соединение и повторите",
         "retry_wait": "↻ …",
         "token_fetch": "⚠️ Получаем новый токен…",
         "token_retry": "↻ Повторяем с новым токеном GPT",
@@ -1443,19 +1446,32 @@ def fetch_chatgpt5free_token(max_wait: float = 8.0) -> Optional[str]:
 class ChatGPTSession:
     """Async OpenAI wrapper with background loop and graceful teardown."""
 
+    @staticmethod
+    def _resolve_api_key(lang: str, logger: Logger = None) -> str:
+        key = os.getenv("UZDEVUMI_OPENAI_KEY") or DEFAULT_OPENAI_KEY
+        if key:
+            return key.strip()
+
+        delay = 1.5
+        for attempt in range(3):
+            log_message(T(lang, "token_fetch"), logger)
+            token = fetch_chatgpt5free_token(max_wait=10.0)
+            if token and token.startswith("Bearer "):
+                token = token[len("Bearer ") :]
+            if token:
+                return token
+            time.sleep(delay)
+            delay *= 1.5
+
+        log_message(T(lang, "token_init_failed"), logger)
+        raise RuntimeError(T(lang, "token_init_failed"))
+
     def __init__(self, lang: str, logger: Logger = None):
         self.lang = lang
         self.logger = logger
         self._client_lock = threading.Lock()
         self.model = "gpt-5.1-latest-chat"
-        self.api_key = os.getenv("UZDEVUMI_OPENAI_KEY") or DEFAULT_OPENAI_KEY
-        if not self.api_key:
-            token = fetch_chatgpt5free_token(max_wait=10.0)
-            if token and token.startswith("Bearer "):
-                token = token[len("Bearer ") :]
-            self.api_key = token
-        if not self.api_key:
-            raise RuntimeError("OpenAI API key missing. Set UZDEVUMI_OPENAI_KEY or configure the worker key store.")
+        self.api_key = self._resolve_api_key(lang, logger)
         self.client = AsyncOpenAI(api_key=self.api_key, timeout=15)
         self._loop = asyncio.new_event_loop()
         self._loop_thread = threading.Thread(
