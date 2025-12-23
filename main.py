@@ -1460,7 +1460,7 @@ class ChatGPTSession:
     """Async OpenAI wrapper with background loop and graceful teardown."""
 
     @staticmethod
-    def _resolve_api_key(lang: str, logger: Logger = None) -> Optional[str]:
+    def _resolve_api_key(lang: str, logger: Logger = None) -> str:
         key = os.getenv("UZDEVUMI_OPENAI_KEY") or DEFAULT_OPENAI_KEY
         if key:
             return key.strip()
@@ -1477,16 +1477,16 @@ class ChatGPTSession:
             delay *= 1.5
 
         log_message(T(lang, "token_init_failed"), logger)
-        return None
+        raise RuntimeError(T(lang, "token_init_failed"))
 
-    def __init__(self, lang: str, logger: Logger = None, dev_mode: bool = False):
+    def __init__(self, lang: str, logger: Logger = None):
         self.lang = lang
         self.logger = logger
         self.dev_mode = dev_mode
         self._client_lock = threading.Lock()
         self.model = "gpt-5.1-latest-chat"
         self.api_key = self._resolve_api_key(lang, logger)
-        self.client = AsyncOpenAI(api_key=self.api_key, timeout=15) if self.api_key else None
+        self.client = AsyncOpenAI(api_key=self.api_key, timeout=15)
         self._loop = asyncio.new_event_loop()
         self._loop_thread = threading.Thread(
             target=self._run_loop, name="gpt-loop", daemon=True
@@ -2124,12 +2124,12 @@ def run_automation(
             retries=3,
         )
         try:
-            gpt_session = ChatGPTSession(lang=lang, logger=logger, dev_mode=dev_mode)
+            gpt_session = ChatGPTSession(lang=lang, logger=logger)
         except Exception:
             log_message(T(lang, "token_missing"), logger)
             gpt_session = None
         try:
-            worker_ai = KeysysChatClient(lang=lang, logger=logger, dev_mode=dev_mode)
+            worker_ai = KeysysChatClient(lang=lang, logger=logger)
         except Exception:
             worker_ai = None
 
