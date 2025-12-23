@@ -261,6 +261,7 @@ I18N = {
         "worker_empty_reply": "⚠️ Worker AI atgrieza tukšu atbildi",
         "worker_fallback": "⚠️ Worker AI kļūme — izmantojam vietējo GPT",
         "token_refreshed": "↺ GPT marķieris atjaunots",
+        "token_init_failed": "⚠️ Nevar iegūt GPT marķieri — pārbaudi interneta savienojumu un mēģini vēlreiz",
         "retry_wait": "↻ …",
         "token_fetch": "⚠️ Iegūstam jaunu marķieri…",
         "token_retry": "↻ Mēģinu vēlreiz ar jaunu GPT marķieri",
@@ -359,6 +360,7 @@ I18N = {
         "worker_empty_reply": "⚠️ Worker AI returned an empty reply",
         "worker_fallback": "⚠️ Worker AI failed — falling back to local GPT",
         "token_refreshed": "↺ GPT token refreshed",
+        "token_init_failed": "⚠️ Unable to obtain a GPT token — check your connection and try again",
         "retry_wait": "↻ …",
         "token_fetch": "⚠️ fetching new token…",
         "token_retry": "↻ Retrying GPT task with new token",
@@ -457,6 +459,7 @@ I18N = {
         "worker_empty_reply": "⚠️ Worker AI вернул пустой ответ",
         "worker_fallback": "⚠️ Сбой Worker AI — используем локальный GPT",
         "token_refreshed": "↺ Токен GPT обновлён",
+        "token_init_failed": "⚠️ Не удаётся получить токен GPT — проверьте соединение и повторите",
         "retry_wait": "↻ …",
         "token_fetch": "⚠️ Получаем новый токен…",
         "token_retry": "↻ Повторяем с новым токеном GPT",
@@ -1443,27 +1446,40 @@ def fetch_chatgpt5free_token(max_wait: float = 8.0) -> Optional[str]:
 class ChatGPTSession:
     """Async OpenAI wrapper with background loop and graceful teardown."""
 
+    @staticmethod
+    def _resolve_api_key(lang: str, logger: Logger = None) -> Optional[str]:
+        key = os.getenv("UZDEVUMI_OPENAI_KEY") or DEFAULT_OPENAI_KEY
+        if key:
+            return key.strip()
+
+        delay = 1.5
+        for attempt in range(3):
+            log_message(T(lang, "token_fetch"), logger)
+            token = fetch_chatgpt5free_token(max_wait=10.0)
+            if token and token.startswith("Bearer "):
+                token = token[len("Bearer ") :]
+            if token:
+                return token
+            time.sleep(delay)
+            delay *= 1.5
+
+        log_message(T(lang, "token_init_failed"), logger)
+        return None
+
     def __init__(self, lang: str, logger: Logger = None):
         self.lang = lang
         self.logger = logger
         self._client_lock = threading.Lock()
         self.model = "gpt-5.1-latest-chat"
-        self.api_key = os.getenv("UZDEVUMI_OPENAI_KEY") or DEFAULT_OPENAI_KEY
-        if not self.api_key:
-            token = fetch_chatgpt5free_token(max_wait=10.0)
-            if token and token.startswith("Bearer "):
-                token = token[len("Bearer ") :]
-            self.api_key = token
-        if not self.api_key:
-            raise RuntimeError("OpenAI API key missing. Set UZDEVUMI_OPENAI_KEY or configure the worker key store.")
-        self.client = AsyncOpenAI(api_key=self.api_key, timeout=15)
+        self.api_key = self._resolve_api_key(lang, logger)
+        self.client = AsyncOpenAI(api_key=self.api_key, timeout=15) if self.api_key else None
         self._loop = asyncio.new_event_loop()
         self._loop_thread = threading.Thread(
             target=self._run_loop, name="gpt-loop", daemon=True
         )
         self._loop_thread.start()
 
-        if not os.getenv("UZDEVUMI_OPENAI_KEY"):
+        if not os.getenv("UZDEVUMI_OPENAI_KEY") and self.api_key:
             threading.Thread(
                 target=self._try_upgrade_token,
                 name="gpt-token-upgrade",
@@ -1502,6 +1518,8 @@ class ChatGPTSession:
         return answer
 
     def ask_task(self, task: TaskData) -> str:
+        if not self._ensure_client():
+            return ""
         future = asyncio.run_coroutine_threadsafe(
             self._ask_task_async(task), self._loop
         )
@@ -1542,6 +1560,26 @@ class ChatGPTSession:
             asyncio.run_coroutine_threadsafe(old_client.close(), self._loop).result(8)
         except Exception:
             pass
+
+    def _ensure_client(self) -> bool:
+        if self.client:
+            return True
+        try:
+            key = self._resolve_api_key(self.lang, self.logger)
+        except Exception:
+            key = None
+
+        if not key:
+            log_message(T(self.lang, "token_missing"), self.logger)
+            return False
+
+        try:
+            self.api_key = key
+            self.client = AsyncOpenAI(api_key=self.api_key, timeout=15)
+            return True
+        except Exception:
+            log_message(T(self.lang, "token_init_failed"), self.logger)
+            return False
 
 
 class KeysysChatClient:
@@ -1903,7 +1941,7 @@ def fill_drag_targets(driver, task: TaskData, values: List[int], lang, logger: L
 
 def solve_one_task(
     main_driver,
-    gpt: ChatGPTSession,
+    gpt: Optional[ChatGPTSession],
     worker_ai: Optional[KeysysChatClient],
     lang: str,
     logger: Logger = None,
@@ -1939,7 +1977,7 @@ def solve_one_task(
             log_message(T(lang, "worker_fallback"), logger)
             answer = ""
 
-    if not answer:
+    if not answer and gpt:
         try:
             answer = gpt.ask_task(task)
             if (
@@ -1963,6 +2001,9 @@ def solve_one_task(
             else:
                 log_message(T(lang, "token_missing"), logger)
                 return 0.0
+    elif not answer and not gpt:
+        log_message(T(lang, "token_missing"), logger)
+        return 0.0
 
     parsed = parse_answer(answer, task)
 
@@ -2032,8 +2073,15 @@ def run_automation(
             logger,
             retries=3,
         )
-        gpt_session = ChatGPTSession(lang=lang, logger=logger)
-        worker_ai = KeysysChatClient(lang=lang, logger=logger)
+        try:
+            gpt_session = ChatGPTSession(lang=lang, logger=logger)
+        except Exception:
+            log_message(T(lang, "token_missing"), logger)
+            gpt_session = None
+        try:
+            worker_ai = KeysysChatClient(lang=lang, logger=logger)
+        except Exception:
+            worker_ai = None
 
         start_top = read_top_points(driver) or 0
         if until_top is not None:
