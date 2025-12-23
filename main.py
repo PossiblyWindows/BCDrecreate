@@ -1941,7 +1941,7 @@ def fill_drag_targets(driver, task: TaskData, values: List[int], lang, logger: L
 
 def solve_one_task(
     main_driver,
-    gpt: ChatGPTSession,
+    gpt: Optional[ChatGPTSession],
     worker_ai: Optional[KeysysChatClient],
     lang: str,
     logger: Logger = None,
@@ -1977,7 +1977,7 @@ def solve_one_task(
             log_message(T(lang, "worker_fallback"), logger)
             answer = ""
 
-    if not answer:
+    if not answer and gpt:
         try:
             answer = gpt.ask_task(task)
             if (
@@ -2001,6 +2001,9 @@ def solve_one_task(
             else:
                 log_message(T(lang, "token_missing"), logger)
                 return 0.0
+    elif not answer and not gpt:
+        log_message(T(lang, "token_missing"), logger)
+        return 0.0
 
     parsed = parse_answer(answer, task)
 
@@ -2070,8 +2073,15 @@ def run_automation(
             logger,
             retries=3,
         )
-        gpt_session = ChatGPTSession(lang=lang, logger=logger)
-        worker_ai = KeysysChatClient(lang=lang, logger=logger)
+        try:
+            gpt_session = ChatGPTSession(lang=lang, logger=logger)
+        except Exception:
+            log_message(T(lang, "token_missing"), logger)
+            gpt_session = None
+        try:
+            worker_ai = KeysysChatClient(lang=lang, logger=logger)
+        except Exception:
+            worker_ai = None
 
         start_top = read_top_points(driver) or 0
         if until_top is not None:
